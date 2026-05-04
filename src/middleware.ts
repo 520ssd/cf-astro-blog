@@ -1,4 +1,4 @@
-import { defineMiddleware } from "astro:middleware";
+﻿import { defineMiddleware } from "astro:middleware";
 
 const EDGE_CACHE_TTL_SECONDS = 300;
 
@@ -120,7 +120,7 @@ function applySecurityHeaders(
 				"form-action 'self'",
 				`script-src ${scriptSources.join(" ")}`,
 				"style-src 'self' 'unsafe-inline' https://giscus.app",
-				"img-src 'self' data: https://assets.ericterminal.com",
+				"img-src 'self' data: https://xy.520jy.eu.cc",
 				"font-src 'self' data: https:",
 				"connect-src 'self' https://giscus.app https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
 				"frame-src 'self' https://giscus.app https://challenges.cloudflare.com",
