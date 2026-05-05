@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+﻿import { eq } from "drizzle-orm";
 import { siteAppearanceSettings } from "@/db/schema";
 import type { Database } from "@/lib/db";
 import {
@@ -119,7 +119,7 @@ export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
 	postCardBlur: 18,
 	articlePanelOpacity: 14,
 	articlePanelBlur: 18,
-	headerSubtitle: "记录我们爱的每一天,在这里有我们爱的证明."
+	headerSubtitle: "记录我们爱的每一天,在这里有我们爱的证明.",
 	navLinks: [...DEFAULT_NAV_LINKS],
 	navLink1Label: DEFAULT_NAV_LINKS[0].label,
 	navLink1Href: DEFAULT_NAV_LINKS[0].href,
