@@ -1,4 +1,4 @@
-export interface SiteConfig {
+﻿export interface SiteConfig {
 	name: string;
 	url: string;
 	description: string;
@@ -21,10 +21,10 @@ export interface CommentConfig {
 }
 
 export const siteConfig: SiteConfig = {
-	name: "jy先生和jx女士 爱的小窝",
+	name: "JY先生和JX女士 爱的小窝",
 	url: "https://lovexy.ggff.net",
-	description: "记录 jy先生和jx女生爱的每一天。",
-	author: "jy先生",
+	description: "记录 JY先生和JX女生爱的每一天。",
+	author: "jy先生"
 	language: "zh-CN",
 	comments: {
 		provider: "giscus",

@@ -161,25 +161,25 @@ export const siteAppearanceSettings = sqliteTable("site_appearance_settings", {
 	articlePanelBlur: integer("article_panel_blur").notNull().default(18),
 	headerSubtitle: text("header_subtitle")
 		.notNull()
-		.default("流畅、克制、持续更新的技术写作"),
+		.default("记录我们爱的每一天,在这里有我们爱的证明."),
 	navLink1Label: text("nav_link_1_label").notNull().default("首页"),
 	navLink1Href: text("nav_link_1_href").notNull().default("/"),
-	navLink2Label: text("nav_link_2_label").notNull().default("归档"),
+	navLink2Label: text("nav_link_2_label").notNull().default("爱情"),
 	navLink2Href: text("nav_link_2_href").notNull().default("/blog"),
 	navLink3Label: text("nav_link_3_label").notNull().default("搜索"),
 	navLink3Href: text("nav_link_3_href").notNull().default("/search"),
 	navLinksJson: text("nav_links_json"),
-	heroKicker: text("hero_kicker").notNull().default("云端记录"),
+	heroKicker: text("hero_kicker").notNull().default("爱的记录"),
 	heroTitle: text("hero_title")
 		.notNull()
-		.default("把工程判断写清楚，把技术细节写漂亮。"),
+		.default("姬钰和陈洁娴一定会在一起一辈子!!!"),
 	heroIntro: text("hero_intro")
 		.notNull()
 		.default(
-			"这里记录 Cloudflare、前端工程、调试过程和系统设计里那些值得反复回看的瞬间。界面会继续打磨，但内容先要足够清晰、足够耐读。",
+			"Welcome to JY先生和JX女士的家里,在这里你可以看到独属于我们爱的日常哦。",
 		),
 	heroMainImagePath: text("hero_main_image_path"),
-	heroPrimaryLabel: text("hero_primary_label").notNull().default("进入归档"),
+	heroPrimaryLabel: text("hero_primary_label").notNull().default("点我见证爱情"),
 	heroPrimaryHref: text("hero_primary_href").notNull().default("/blog"),
 	heroSecondaryLabel: text("hero_secondary_label")
 		.notNull()
@@ -189,11 +189,11 @@ export const siteAppearanceSettings = sqliteTable("site_appearance_settings", {
 	heroSignalLabel: text("hero_signal_label").notNull().default("Scene Depth"),
 	heroSignalHeading: text("hero_signal_heading")
 		.notNull()
-		.default("首页会跟着你的视线轻轻转一下"),
+		.default("JY先生和JX女士------恋爱保证书"),
 	heroSignalCopy: text("hero_signal_copy")
 		.notNull()
 		.default(
-			"不是把页面做得很吵，而是只让首屏层次、信息胶囊和按钮反馈更有呼吸感。",
+			"陈洁娴要和姬钰在一起多久？            一辈子！一辈子不离不弃!",
 		),
 	heroSignalImagePath: text("hero_signal_image_path"),
 	heroSignalChip1: text("hero_signal_chip_1").notNull().default("Mouse Sync"),
@@ -202,7 +202,7 @@ export const siteAppearanceSettings = sqliteTable("site_appearance_settings", {
 	articleSidebarAvatarPath: text("article_sidebar_avatar_path"),
 	articleSidebarName: text("article_sidebar_name")
 		.notNull()
-		.default("Eric-Terminal"),
+		.default("JY先生"),
 	articleSidebarBio: text("article_sidebar_bio")
 		.notNull()
 		.default("在比特海里未雨绸缪，身后养着一只叫晖的狐狸。"),

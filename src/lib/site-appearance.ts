@@ -16,12 +16,12 @@ const MAX_DYNAMIC_LINK_ITEMS = 16;
 
 const DEFAULT_NAV_LINKS: SiteNavLink[] = [
 	{ label: "首页", href: "/" },
-	{ label: "归档", href: "/blog" },
+	{ label: "爱情", href: "/blog" },
 	{ label: "搜索", href: "/search" },
 ];
 
 const DEFAULT_HERO_ACTIONS: SiteNavLink[] = [
-	{ label: "进入归档", href: "/blog" },
+	{ label: "点我见证爱情", href: "/blog" },
 	{ label: "站内搜索", href: "/search" },
 ];
 
@@ -119,7 +119,7 @@ export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
 	postCardBlur: 18,
 	articlePanelOpacity: 14,
 	articlePanelBlur: 18,
-	headerSubtitle: "流畅、克制、持续更新的技术写作",
+	headerSubtitle: "记录我们爱的每一天,在这里有我们爱的证明."
 	navLinks: [...DEFAULT_NAV_LINKS],
 	navLink1Label: DEFAULT_NAV_LINKS[0].label,
 	navLink1Href: DEFAULT_NAV_LINKS[0].href,
@@ -127,10 +127,10 @@ export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
 	navLink2Href: DEFAULT_NAV_LINKS[1].href,
 	navLink3Label: DEFAULT_NAV_LINKS[2].label,
 	navLink3Href: DEFAULT_NAV_LINKS[2].href,
-	heroKicker: "云端记录",
-	heroTitle: "把工程判断写清楚，把技术细节写漂亮。",
+	heroKicker: "爱的记录",
+	heroTitle: "姬钰和陈洁娴一定会在一起一辈子!!!",
 	heroIntro:
-		"这里记录 Cloudflare、前端工程、调试过程和系统设计里那些值得反复回看的瞬间。界面会继续打磨，但内容先要足够清晰、足够耐读。",
+		"Welcome to JY先生和JX女士的家里,在这里你可以看到独属于我们爱的日常哦。",
 	heroMainImagePath: null,
 	heroActions: [...DEFAULT_HERO_ACTIONS],
 	heroPrimaryLabel: DEFAULT_HERO_ACTIONS[0].label,
@@ -138,15 +138,15 @@ export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
 	heroSecondaryLabel: DEFAULT_HERO_ACTIONS[1].label,
 	heroSecondaryHref: DEFAULT_HERO_ACTIONS[1].href,
 	heroSignalLabel: "Scene Depth",
-	heroSignalHeading: "首页会跟着你的视线轻轻转一下",
+	heroSignalHeading: "JY先生和JX女士------恋爱保证书",
 	heroSignalCopy:
-		"不是把页面做得很吵，而是只让首屏层次、信息胶囊和按钮反馈更有呼吸感。",
+		"陈洁娴要和姬钰在一起多久？            一辈子！一辈子不离不弃!",
 	heroSignalImagePath: null,
-	heroSignalChip1: "Mouse Sync",
-	heroSignalChip2: "Soft Orbit",
-	heroSignalChip3: "Card Lift",
+	heroSignalChip1: "JY",
+	heroSignalChip2: "LOVE",
+	heroSignalChip3: "JX",
 	articleSidebarAvatarPath: null,
-	articleSidebarName: "Eric-Terminal",
+	articleSidebarName: "JY先生",
 	articleSidebarBio: "在比特海里未雨绸缪，身后养着一只叫晖的狐狸。",
 	articleSidebarBadge: "文章作者",
 	mcpEnabled: true,
