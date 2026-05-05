@@ -24,7 +24,7 @@ export const siteConfig: SiteConfig = {
 	name: "JY先生和JX女士 爱的小窝",
 	url: "https://lovexy.ggff.net",
 	description: "记录 JY先生和JX女生爱的每一天。",
-	author: "jy先生"
+	author: "jy先生",
 	language: "zh-CN",
 	comments: {
 		provider: "giscus",
