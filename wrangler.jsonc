@@ -38,9 +38,13 @@
 	],
 
 	"vars": {
-		"SITE_NAME": "jy先生和jx女士 爱的小窝",
+		"SITE_NAME": "JY先生和JX女士 爱的小窝",
 		"SITE_URL": "https://lovexy.ggff.net",
-		"TURNSTILE_SITE_KEY": "0x4AAAAAACnxh79QQawnz9UI"
+		"TURNSTILE_SITE_KEY": "0x4AAAAAACnxh79QQawnz9UI",
+                                "ADMIN_GITHUB_LOGIN": "520ssd",
+                                "AUTO_DEPLOY_GITHUB_EVENT_TYPE": "rebuild-search-index",
+                                "AUTO_DEPLOY_WEBHOOK_URL": "https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/fb430efb-0a76-4614-bd43-e5a4e21c2d2b",
+                                "GITHUB_OAUTH_CLIENT_ID": "Ov23liRK6wiHEee0sNsF"
 	}
 
 	// 机密变量可通过 `wrangler secret put` 或本地 `.dev.vars` 配置
