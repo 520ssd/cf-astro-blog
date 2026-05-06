@@ -28,10 +28,10 @@ export const siteConfig: SiteConfig = {
 	language: "zh-CN",
 	comments: {
 		provider: "giscus",
-		repo: "Eric-Terminal/cf-astro-blog",
-		repoId: "R_kgDORhlfAw",
+		repo: "520ssd/cf-astro-blog",
+		repoId: "R_kgDOSPwnGQ",
 		category: "Announcements",
-		categoryId: "DIC_kwDORhlfA84C39BM",
+		categoryId: "DIC_kwDOSPwnGc4C8bhM",
 		mapping: "pathname",
 		strict: false,
 		reactionsEnabled: true,
