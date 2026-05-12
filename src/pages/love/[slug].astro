@@ -1,28 +1,20 @@
 ---
+export const prerender = false;
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-import { blogPosts } from "@/db/schema";
-import { getDb } from "@/lib/db";
+import { blogPosts, blogCategories } from "@/db/schema";
 import Base from "@/layouts/Base.astro";
+import { getDb } from "@/lib/db";
 
-// 🔥 必须加这一行！告诉 Astro 这是 SSR 动态路由
-export const prerender = false;
-
-// 读取路由参数
 const { slug } = Astro.params;
 const db = getDb(env.DB);
 
-// 查询数据库
 const post = await db.query.blogPosts.findFirst({
   where: eq(blogPosts.slug, slug),
 });
 
-// 找不到文章跳 404
-if (!post) {
-  return Astro.redirect("/404");
-}
+if (!post) return Astro.redirect("/love");
 
-// 相恋天数
 const startDateStr = "2026-03-20";
 function getLoveDays(startStr: string) {
   const start = new Date(startStr);
@@ -30,106 +22,67 @@ function getLoveDays(startStr: string) {
   return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 const loveDays = getLoveDays(startDateStr);
-
-// 情话
-const loveWords = [
-  "山河辽阔，人间烟火，皆是你❤️",
-  "始于初见，止于终老，余生皆是你",
-  "朝朝暮暮，岁岁年年，不离不弃",
-  "有幸相逢，不负遇见，满心欢喜都是你"
-];
 ---
 
-<Base title={post.title} description={post.excerpt || "我们的犯错记录(一定要有证据！)"}>
-  <section
-    class="love-hero archive-hero-depth glass-panel"
-    data-tilt-card
-    data-tilt-scale="0.38"
-    data-tilt-shift-scale="0.68"
-  >
-    <div class="love-hero-copy archive-hero-copy">
-      <span class="section-kicker">专属小窝</span>
-      <h1 class="page-title">💌 {post.title}</h1>
-      <p class="page-intro">{post.excerpt || "岁岁年年，朝朝暮暮，爱意永存 ❤️"}</p>
-    </div>
-    <div class="love-hero-meta archive-hero-meta">
-      <div class="hero-summary">
-        <span>相恋天数</span>
-        <strong id="dayCount">{loveDays}</strong>
-      </div>
-      <div class="hero-summary">
-        <span>相守余生</span>
-        <strong>永远相伴</strong>
-      </div>
+<Base title={post.title}>
+  <section class="love-hero">
+    <div class="love-hero-inner">
+      <h1>{post.title}</h1>
+      <p>犯错存档 · 相恋第 {loveDays} 天</p>
     </div>
   </section>
 
   {post.featuredImageKey && (
-    <div class="love-album glass-panel">
-      <img class="album-img" src={post.featuredImageKey} alt={post.featuredImageAlt || "情侣合照"}>
+    <div class="love-img">
+      <img src={post.featuredImageKey} alt={post.title} />
     </div>
   )}
 
-  <div class="love-content glass-panel">
-    <article class="prose">
-      {post.content}
-    </article>
-  </div>
-
-  <div class="love-word-card glass-panel">
-    <p class="love-text" id="loveText"></p>
-  </div>
+  <div class="love-content" set:html={post.content}></div>
 
   <div id="heartContainer"></div>
+  <a href="/love" class="back-btn">← 返回犯错记录</a>
 </Base>
 
 <style>
-  .love-hero,
-  .love-album,
-  .love-content,
-  .love-word-card {
-    --glass-panel-opacity: calc(var(--hero-card-opacity, 14) / 100);
-    --glass-panel-blur: var(--hero-card-blur, 18px);
-    margin-bottom: 1.2rem;
-  }
-
   .love-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.7fr);
-    gap: 1.2rem;
-    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
-  }
-
-  .love-hero-meta {
-    display: grid;
-    gap: 0.9rem;
-  }
-
-  .love-album {
-    padding: 1.5rem;
+    padding: 2rem 1rem;
     text-align: center;
   }
-  .album-img {
-    max-width: 100%;
-    max-height: 400px;
-    object-fit: cover;
-    border-radius: 16px;
-    box-shadow: 0 6px 20px rgba(200, 62, 108, 0.25);
+  .love-hero-inner {
+    max-width: 700px;
+    margin: 0 auto;
   }
-
+  .love-hero h1 {
+    color: #ff6b9d;
+    font-size: 1.8rem;
+  }
+  .love-hero p {
+    color: #888;
+  }
+  .love-img {
+    max-width: 700px;
+    margin: 0 auto 2rem;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .love-img img {
+    width: 100%;
+    display: block;
+  }
   .love-content {
-    padding: 2rem;
+    max-width: 700px;
+    margin: 0 auto 4rem;
+    padding: 0 1rem;
+    color: #eee;
+    line-height: 1.7;
   }
-
-  .love-word-card {
-    padding: 2rem;
+  .back-btn {
+    display: block;
     text-align: center;
-  }
-  .love-text {
-    font-size: 1.1rem;
-    line-height: 1.8;
-    color: var(--color-text);
-    min-height: 80px;
+    color: #ff6b9d;
+    text-decoration: none;
+    margin-bottom: 3rem;
   }
 
   .fall-heart {
@@ -137,12 +90,11 @@ const loveWords = [
     top: -10%;
     color: #ff87a5;
     font-size: 20px;
-    animation: fall linear infinite;
+    animation: fall 4s linear infinite;
     opacity: 0.7;
     pointer-events: none;
     z-index: 99;
   }
-
   .click-float-heart {
     position: absolute;
     color: #ff5e8c;
@@ -151,60 +103,23 @@ const loveWords = [
     animation: floatUp 1s ease-out forwards;
     z-index: 999;
   }
-
   @keyframes fall {
     0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
     100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
   }
-
   @keyframes floatUp {
     0% { transform: translateY(0); opacity: 1; }
     100% { transform: translateY(-150px); opacity: 0; }
   }
-
-  @media (max-width: 840px) {
-    .love-hero {
-      grid-template-columns: 1fr;
-    }
-    .album-img {
-      max-height: 220px;
-    }
-  }
-
-  @media (hover: none), (pointer: coarse) {
-    .archive-hero-depth,
-    .archive-hero-depth::before,
-    .archive-hero-copy,
-    .archive-hero-meta {
-      transform: none;
-    }
-  }
 </style>
 
 <script>
-  const loveWords = [
-    "山河辽阔，人间烟火，皆是你❤️",
-    "始于初见，止于终老，余生皆是你",
-    "朝朝暮暮，岁岁年年，不离不弃",
-    "有幸相逢，不负遇见，满心欢喜都是你"
-  ];
-
-  let wordIdx = 0;
-  const loveTextDom = document.getElementById("loveText");
-  function switchLoveWord() {
-    loveTextDom.innerText = loveWords[wordIdx];
-    wordIdx = (wordIdx + 1) % loveWords.length;
-  }
-  switchLoveWord();
-  setInterval(switchLoveWord, 4000);
-
   const container = document.getElementById("heartContainer");
   function createFallHeart() {
     const heart = document.createElement("div");
     heart.className = "fall-heart";
     heart.innerHTML = "❤️";
     heart.style.left = Math.random() * 100 + "vw";
-    heart.style.animationDuration = Math.random() * 3 + 4 + "s";
     container.appendChild(heart);
     setTimeout(() => heart.remove(), 7000);
   }
@@ -221,13 +136,13 @@ const loveWords = [
   });
 
   document.body.addEventListener("dblclick", (e) => {
-    for(let i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i++) {
       setTimeout(() => {
         const heart = document.createElement("div");
         heart.className = "click-float-heart";
         heart.innerHTML = "💗";
         heart.style.fontSize = "40px";
-        heart.style.left = (e.pageX + Math.random() * 60 - 30) + "px";
+        heart.style.left = e.pageX + (Math.random() * 60 - 30) + "px";
         heart.style.top = e.pageY + "px";
         container.appendChild(heart);
         setTimeout(() => heart.remove(), 1200);
