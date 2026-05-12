@@ -1,0 +1,399 @@
+---
+export const prerender = false;
+
+import { env } from "cloudflare:workers";
+import { desc, sql } from "drizzle-orm";
+import PostCard from "@/components/PostCard.astro";
+import { blogPosts } from "@/db/schema";
+import Base from "@/layouts/Base.astro";
+import { getDb } from "@/lib/db";
+import { estimateArticleReadStats } from "@/lib/format";
+import { getPublicPostVisibilityCondition } from "@/lib/public-content";
+
+const page = Number(Astro.url.searchParams.get("page") || "1");
+const limit = 10;
+const offset = (page - 1) * limit;
+
+interface LovePostSourceRow {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string | null;
+  publishedAt: string | null;
+  authorName: string | null;
+  featuredImageKey: string | null;
+  featuredImageAlt: string | null;
+}
+
+interface LovePostCardRow {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  publishedAt: string | null;
+  authorName: string | null;
+  categoryName: string | null;
+  featuredImageKey: string | null;
+  featuredImageAlt: string | null;
+  cjkCharCount: number;
+  latinWordCount: number;
+  estimatedReadingMinutes: number;
+}
+
+let posts: LovePostCardRow[] = [];
+let totalPosts = 0;
+
+try {
+  const db = getDb(env.DB);
+
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(blogPosts)
+    .where(getPublicPostVisibilityCondition());
+  totalPosts = countResult?.count ?? 0;
+
+  const rows: LovePostSourceRow[] = await db
+    .select({
+      title: blogPosts.title,
+      slug: blogPosts.slug,
+      content: blogPosts.content,
+      excerpt: blogPosts.excerpt,
+      publishedAt: blogPosts.publishedAt,
+      authorName: blogPosts.authorName,
+      featuredImageKey: blogPosts.featuredImageKey,
+      featuredImageAlt: blogPosts.featuredImageAlt,
+    })
+    .from(blogPosts)
+    .where(getPublicPostVisibilityCondition())
+    .orderBy(desc(blogPosts.publishedAt))
+    .limit(limit)
+    .offset(offset);
+
+  posts = rows.map((row) => {
+    const readingStats = estimateArticleReadStats(row.content);
+    return {
+      ...row,
+      categoryName: "爱情日记",
+      cjkCharCount: readingStats.cjkCharCount,
+      latinWordCount: readingStats.latinWordCount,
+      estimatedReadingMinutes: readingStats.estimatedReadingMinutes,
+    };
+  });
+} catch { }
+
+const totalPages = Math.ceil(totalPosts / limit);
+---
+
+<Base title="爱情日记" description="专属于我们的甜蜜记录与犯错小本本 ❤️">
+  <section
+    class="archive-hero archive-hero-depth glass-panel"
+    data-tilt-card
+    data-tilt-scale="0.38"
+    data-tilt-shift-scale="0.68"
+  >
+    <div class="archive-hero-copy">
+      <span class="section-kicker">专属小窝</span>
+      <h1 class="page-title">💌 爱情日记</h1>
+      <p class="page-intro">
+        这里记录着我们的点点滴滴、甜蜜瞬间、犯错反省，每一篇都是我们独有的回忆 ❤️
+      </p>
+    </div>
+    <div class="archive-hero-meta">
+      <div class="hero-summary">
+        <span>甜蜜记录</span>
+        <strong>{totalPosts}</strong>
+      </div>
+      <div class="hero-summary">
+        <span>当前页码</span>
+        <strong>{page} / {Math.max(totalPages, 1)}</strong>
+      </div>
+    </div>
+  </section>
+
+  {posts.length > 0 ? (
+    <div class="archive-grid">
+      {posts.map((post, index) => (
+        <PostCard
+          title={post.title}
+          slug={`love/${post.slug}`}
+          excerpt={post.excerpt}
+          publishedAt={post.publishedAt}
+          authorName={post.authorName}
+          categoryName={post.categoryName}
+          featuredImageKey={post.featuredImageKey}
+          featuredImageAlt={post.featuredImageAlt}
+          cjkCharCount={post.cjkCharCount}
+          latinWordCount={post.latinWordCount}
+          estimatedReadingMinutes={post.estimatedReadingMinutes}
+          coverSide={index % 2 === 0 ? "left" : "right"}
+        />
+      ))}
+    </div>
+  ) : (
+    <div class="empty-state glass-panel">
+      <p>还没有爱情日记，快来写下第一篇吧 ❤️</p>
+    </div>
+  )}
+
+  {totalPages > 1 && (
+    <nav class="pagination glass-panel" aria-label="分页">
+      {page > 1 ? (
+        <a href={`/love?page=${page - 1}`} class="button button-secondary">上一页</a>
+      ) : (
+        <span class="pagination-placeholder" />
+      )}
+      <span class="pagination-status">第 {page} 页，共 {totalPages} 页</span>
+      {page < totalPages ? (
+        <a href={`/love?page=${page + 1}`} class="button button-secondary">下一页</a>
+      ) : (
+        <span class="pagination-placeholder" />
+      )}
+    </nav>
+  )}
+
+  <div id="heartContainer"></div>
+</Base>
+
+<style>
+  .archive-hero,
+  .pagination {
+    --glass-panel-opacity: calc(var(--hero-card-opacity, 14) / 100);
+    --glass-panel-blur: var(--hero-card-blur, 18px);
+    margin-bottom: 1.2rem;
+  }
+
+  .archive-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.7fr);
+    gap: 1.2rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  }
+
+  .archive-hero-depth {
+    position: relative;
+    overflow: hidden;
+    transform:
+      perspective(1200px)
+      rotateX(var(--tilt-rotate-x, 0deg))
+      rotateY(var(--tilt-rotate-y, 0deg))
+      scale3d(1.002, 1.002, 1.002);
+    transform-style: preserve-3d;
+    transition:
+      transform var(--nav-motion-surface),
+      box-shadow var(--nav-motion-surface);
+  }
+
+  .archive-hero-depth::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+        circle at 84% 18%,
+        rgba(10, 132, 255, 0.18),
+        transparent 42%
+      ),
+      linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.12),
+        rgba(255, 255, 255, 0.02) 54%,
+        transparent
+      );
+    opacity: 0.68;
+    pointer-events: none;
+    transform: translate3d(
+      calc(var(--tilt-shift-x, 0) * -8px),
+      calc(var(--tilt-shift-y, 0) * -8px),
+      0
+    );
+    transition: transform var(--nav-motion-surface);
+  }
+
+  .archive-hero-copy {
+    display: grid;
+    gap: 1rem;
+    position: relative;
+    z-index: 1;
+    transform: translate3d(
+      calc(var(--tilt-shift-x, 0) * 2px),
+      calc(var(--tilt-shift-y, 0) * 2px),
+      14px
+    );
+    transition: transform var(--nav-motion-surface);
+  }
+
+  .archive-hero-meta {
+    display: grid;
+    gap: 0.9rem;
+    position: relative;
+    z-index: 1;
+    transform: translate3d(
+      calc(var(--tilt-shift-x, 0) * 4px),
+      calc(var(--tilt-shift-y, 0) * 4px),
+      24px
+    );
+    transition: transform var(--nav-motion-surface);
+  }
+
+  .hero-summary {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: var(--radius-inner);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+  }
+
+  .hero-summary span {
+    font-size: 0.84rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .hero-summary strong {
+    font-size: clamp(1.5rem, 1.2rem + 1vw, 2.1rem);
+    color: var(--color-text);
+    letter-spacing: -0.04em;
+  }
+
+  .archive-grid {
+    display: grid;
+    gap: 1.2rem;
+  }
+
+  .pagination {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+  }
+
+  .pagination-status {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+  }
+
+  .pagination .button:last-child {
+    justify-self: end;
+  }
+
+  .pagination .button:first-child {
+    justify-self: start;
+  }
+
+  .pagination-placeholder {
+    display: block;
+    min-height: 1px;
+  }
+
+  /* 爱心特效样式 和详情页完全一致 */
+  .fall-heart {
+    position: fixed;
+    top: -10%;
+    color: #ff87a5;
+    font-size: 20px;
+    animation: fall linear infinite;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 99;
+  }
+
+  .click-float-heart {
+    position: absolute;
+    color: #ff5e8c;
+    font-size: 26px;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    z-index: 999;
+  }
+
+  @keyframes fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+    100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+  }
+
+  @keyframes floatUp {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-150px); opacity: 0; }
+  }
+
+  @media (max-width: 840px) {
+    .archive-hero {
+      grid-template-columns: 1fr;
+    }
+    .pagination {
+      grid-template-columns: 1fr;
+    }
+    .pagination .button:last-child,
+    .pagination .button:first-child {
+      justify-self: stretch;
+    }
+  }
+
+  @media (hover: none), (pointer: coarse) {
+    .archive-hero-depth,
+    .archive-hero-depth::before,
+    .archive-hero-copy,
+    .archive-hero-meta {
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  const loveWords = [
+    "山河辽阔，人间烟火，皆是你❤️",
+    "始于初见，止于终老，余生皆是你",
+    "朝朝暮暮，岁岁年年，不离不弃",
+    "有幸相逢，不负遇见，满心欢喜都是你"
+  ];
+
+  let wordIdx = 0;
+  function switchLoveWord() {
+    wordIdx = (wordIdx + 1) % loveWords.length;
+  }
+  switchLoveWord();
+  setInterval(switchLoveWord, 4000);
+
+  const container = document.getElementById("heartContainer");
+  function createFallHeart() {
+    const heart = document.createElement("div");
+    heart.className = "fall-heart";
+    heart.innerHTML = "❤️";
+    heart.style.left = Math.random() * 100 + "vw";
+    heart.style.animationDuration = Math.random() * 3 + 4 + "s";
+    container.appendChild(heart);
+    setTimeout(() => heart.remove(), 7000);
+  }
+  setInterval(createFallHeart, 300);
+
+  document.body.addEventListener("click", (e) => {
+    const heart = document.createElement("div");
+    heart.className = "click-float-heart";
+    heart.innerHTML = "❤️";
+    heart.style.left = e.pageX + "px";
+    heart.style.top = e.pageY + "px";
+    container.appendChild(heart);
+    setTimeout(() => heart.remove(), 1000);
+  });
+
+  document.body.addEventListener("dblclick", (e) => {
+    for(let i = 0; i < 6; i++) {
+      setTimeout(() => {
+        const heart = document.createElement("div");
+        heart.className = "click-float-heart";
+        heart.innerHTML = "💗";
+        heart.style.fontSize = "40px";
+        heart.style.left = (e.pageX + Math.random() * 60 - 30) + "px";
+        heart.style.top = e.pageY + "px";
+        container.appendChild(heart);
+        setTimeout(() => heart.remove(), 1200);
+      }, i * 100);
+    }
+  });
+</script>
