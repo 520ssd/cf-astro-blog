@@ -5,16 +5,24 @@ import { blogPosts } from "@/db/schema";
 import { getDb } from "@/lib/db";
 import Base from "@/layouts/Base.astro";
 
-// 读取后台文章，访问路径 = /love
+// 🔥 必须加这一行！告诉 Astro 这是 SSR 动态路由
+export const prerender = false;
+
+// 读取路由参数
 const { slug } = Astro.params;
 const db = getDb(env.DB);
+
+// 查询数据库
 const post = await db.query.blogPosts.findFirst({
   where: eq(blogPosts.slug, slug),
 });
 
-if (!post) return Astro.redirect("/404");
+// 找不到文章跳 404
+if (!post) {
+  return Astro.redirect("/404");
+}
 
-// 计算相恋天数（可以在文章里自定义纪念日，这里写死也可以）
+// 相恋天数
 const startDateStr = "2026-03-20";
 function getLoveDays(startStr: string) {
   const start = new Date(startStr);
@@ -23,7 +31,7 @@ function getLoveDays(startStr: string) {
 }
 const loveDays = getLoveDays(startDateStr);
 
-// 情话列表
+// 情话
 const loveWords = [
   "山河辽阔，人间烟火，皆是你❤️",
   "始于初见，止于终老，余生皆是你",
@@ -56,21 +64,18 @@ const loveWords = [
     </div>
   </section>
 
-  <!-- 读取后台上传的封面图 -->
   {post.featuredImageKey && (
     <div class="love-album glass-panel">
       <img class="album-img" src={post.featuredImageKey} alt={post.featuredImageAlt || "情侣合照"}>
     </div>
   )}
 
-  <!-- 读取后台正文内容 -->
   <div class="love-content glass-panel">
     <article class="prose">
       {post.content}
     </article>
   </div>
 
-  <!-- 情话轮播 -->
   <div class="love-word-card glass-panel">
     <p class="love-text" id="loveText"></p>
   </div>
