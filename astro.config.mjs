@@ -21,14 +21,22 @@ export default defineConfig({
       },
     },
   },
-  // 👇 这是新增的重定向规则
+
+  // ✅ 关键配置：同时支持 /blog 和 /love 两个目录
   server: {
     async rewrite(req) {
       const url = new URL(req.url);
-      // 自动把 /blog/love-xxx 重写为 /love/xxx
-      if (url.pathname.startsWith("/blog/love-")) {
-        return url.pathname.replace("/blog/love-", "/love/");
+
+      // 支持 /blog/xxx → 正常访问
+      if (url.pathname.startsWith("/blog/")) {
+        return url.pathname;
       }
+
+      // 支持 /love/xxx → 正常访问
+      if (url.pathname.startsWith("/love/")) {
+        return url.pathname;
+      }
+
       return undefined;
     },
   },
