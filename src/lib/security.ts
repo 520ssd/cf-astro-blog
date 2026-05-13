@@ -47,9 +47,23 @@ export function sanitizeSlug(value: unknown): string | null {
 		.replaceAll(/-+/g, "-")
 		.replaceAll(/^-+|-+$/g, "");
 
-	if (!normalized || !SLUG_VALID_PATTERN.test(normalized)) {
-		return null;
-	}
+	if (!normalized) {
+    return null;
+  }
+
+  // 如果包含斜杠，按多级路径处理：每段分别验证
+  if (normalized.includes("/")) {
+    const segments = normalized.split("/").filter(Boolean);
+    if (segments.length === 0) return null;
+    // 每段不能为空，且每段要符合基本规则
+    const valid = segments.every(seg => /^[\p{Letter}\p{Number}]+(?:-[\p{Letter}\p{Number}]+)*$/u.test(seg));
+    return valid ? normalized : null;
+  }
+
+  // 不包含斜杠，走原来的逻辑
+  if (!SLUG_VALID_PATTERN.test(normalized)) {
+    return null;
+  }
 
 	return normalized;
 }

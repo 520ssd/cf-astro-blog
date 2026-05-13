@@ -1391,7 +1391,6 @@ titleInput?.addEventListener("input", updateSlugFromTitle);
 
 slugInput?.addEventListener("input", () => {
 	if (slugInput instanceof HTMLInputElement) {
-		slugInput.value = buildSlugValue(slugInput.value);
 		slugInput.dataset.manual = slugInput.value ? "true" : "false";
 		if (!slugInput.value) {
 			slugInput.dataset.manual = "false";
