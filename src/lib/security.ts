@@ -5,7 +5,7 @@ const SAFE_HTTP_URL_PROTOCOLS = new Set(["http:", "https:"]);
 const SAFE_URL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const SLUG_SEGMENT_PATTERN = /[^\p{Letter}\p{Number}]+/gu;
 const SLUG_VALID_PATTERN =
-	/^[\p{Letter}\p{Number}]+(?:-[\p{Letter}\p{Number}]+)*$/u;
+	/^[\p{Letter}\p{Number}]+(?:[-\/][\p{Letter}\p{Number}]+)*$/u;
 
 export type PostStatus = (typeof POST_STATUS_VALUES)[number];
 
