@@ -717,7 +717,9 @@ function buildSlugValue(value) {
 		.normalize("NFKC")
 		.replaceAll(/[^\p{Letter}\p{Number}]+/gu, "-")
 		.replaceAll(/-+/g, "-")
-		.replaceAll(/^-+|-+$/g, "");
+                                .replaceAll(/\/+/g, "/")
+		.replaceAll(/^-+|-+$/g, "")
+                                .replaceAll(/^\/+|\/+$/g, "");
 }
 
 function normalizePostMediaScope(value) {

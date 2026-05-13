@@ -180,7 +180,7 @@ export function postEditorPage(data: EditorData): string {
 							placeholder="留空自动生成"
 							data-manual="${isEdit ? "true" : "false"}"
 						/>
-						<p class="form-help">/blog/<span data-slug-preview>${escapeHtml(post?.slug || "自动生成")}</span>（支持中文，访问时会自动 URL 编码）</p>
+						<p class="form-help">/<span data-slug-preview>${escapeHtml(post?.slug || "自动生成")}</span>（支持中文，访问时会自动 URL 编码）</p>
 					</div>
 
 					<div class="form-group">
