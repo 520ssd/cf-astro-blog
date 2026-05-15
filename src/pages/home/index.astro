@@ -8,6 +8,7 @@ import Base from "@/layouts/Base.astro";
 import { getDb } from "@/lib/db";
 import { getPublicPostVisibilityCondition } from "@/lib/public-content";
 
+const articleSlug = Astro.url.searchParams.get("article");
 const page = Number(Astro.url.searchParams.get("page") || "1");
 const limit = 12;
 const offset = (page - 1) * limit;
@@ -23,15 +24,34 @@ interface HomePostRow {
 
 let posts: HomePostRow[] = [];
 let totalPosts = 0;
+let detailPost: HomePostRow | null = null;
 
 try {
   const db = getDb(env.DB);
+
+  if (articleSlug) {
+    const [found] = await db
+      .select({
+        title: blogPosts.title,
+        slug: blogPosts.slug,
+        excerpt: blogPosts.excerpt,
+        publishedAt: blogPosts.publishedAt,
+        featuredImageKey: blogPosts.featuredImageKey,
+        content: blogPosts.content,
+      })
+      .from(blogPosts)
+      .where(
+        sql`${getPublicPostVisibilityCondition()} AND ${blogPosts.slug} = ${articleSlug}`
+      )
+      .limit(1);
+    detailPost = found || null;
+  }
 
   const [countRes] = await db
     .select({ count: sql<number>`count(*)` })
     .from(blogPosts)
     .where(
-      sql`${getPublicPostVisibilityCondition()} AND ${blogPosts.slug} LIKE 'home/%'`
+      sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'home' OR ${blogPosts.slug} LIKE 'home/%' OR ${blogPosts.slug} LIKE 'home-%')`
     );
   totalPosts = countRes?.count ?? 0;
 
@@ -46,7 +66,7 @@ try {
     })
     .from(blogPosts)
     .where(
-      sql`${getPublicPostVisibilityCondition()} AND ${blogPosts.slug} LIKE 'home/%'`
+      sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'home' OR ${blogPosts.slug} LIKE 'home/%' OR ${blogPosts.slug} LIKE 'home-%')`
     )
     .orderBy(desc(blogPosts.publishedAt))
     .limit(limit)
@@ -95,10 +115,16 @@ function formatDate(dateStr: string | null | undefined): string {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  return `${year}年${month}月${day}日`;
+  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}`;
 }
 
-// 随机恋爱格言
+function formatDetailDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 const loveQuotes = [
   "你是我一生只会遇见一次的惊喜",
   "有你的每一天，都是情人节",
@@ -114,126 +140,186 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
 
 <Base title="我们的恋爱日常" description="记录和你在一起的每一天 💕">
   <div class="home-page">
-    <!-- 顶部大图区域 -->
-    <header class="home-hero">
-      <div class="home-hero-bg"></div>
-      <div class="home-hero-stars" id="heroStars"></div>
-      <div class="home-hero-content">
-        <div class="home-hero-date">
-          <span class="home-hero-day">{new Date().getDate()}</span>
-          <span class="home-hero-month">{new Date().getMonth() + 1}月</span>
-          <span class="home-hero-weekday">
-            {["日", "一", "二", "三", "四", "五", "六"][new Date().getDay()]}曜日
-          </span>
-        </div>
-        <h1 class="home-hero-title">
-          <span class="home-hero-title-line">我们的</span>
-          <span class="home-hero-title-line love-gradient-text">恋爱日常</span>
-        </h1>
-        <p class="home-hero-quote">“{todayQuote}”</p>
-        <div class="home-hero-stats">
-          <div class="home-hero-stat">
-            <div class="home-hero-stat-number">{loveDays}</div>
-            <div class="home-hero-stat-label">相恋天数</div>
+    {detailPost ? (
+      <!-- ===== 文章详情页 ===== -->
+      <article class="detail-page">
+        <header class="detail-hero">
+          <div class="detail-hero-badge">
+            <span>📖 恋爱日常</span>
           </div>
-          <div class="home-hero-stat-heart">💗</div>
-          <div class="home-hero-stat">
-            <div class="home-hero-stat-number">{totalPosts}</div>
-            <div class="home-hero-stat-label">甜蜜瞬间</div>
+          <h1 class="detail-title">{detailPost.title}</h1>
+          <div class="detail-meta">
+            <span>💑 相恋第 {loveDays} 天</span>
+            {detailPost.publishedAt && <span>📅 {formatDetailDate(detailPost.publishedAt)}</span>}
           </div>
+        </header>
+
+        {detailPost.featuredImageKey && (
+          <div class="detail-image-wrap">
+            <img src={`/media/${detailPost.featuredImageKey}`} alt={detailPost.title} class="detail-image" />
+          </div>
+        )}
+
+        <div class="detail-body">
+          <div class="detail-content" set:html={detailPost.content}></div>
         </div>
-        <div class="home-hero-scroll">
-          <span>向下滑动</span>
-          <div class="home-hero-scroll-arrow">⌄</div>
-        </div>
-      </div>
-    </header>
 
-    <!-- 时间线日记 -->
-    <main class="home-main">
-      <div class="home-section-header">
-        <h2 class="home-section-title">
-          <span>📖</span> 我们的故事
-        </h2>
-        <p class="home-section-desc">每一个瞬间，都值得被珍藏</p>
-      </div>
+        <footer class="detail-footer">
+          <a href="/home" class="detail-back-btn">← 返回恋爱日常</a>
+          <div class="detail-footer-hearts">❤️ 💕 💗 💖</div>
+        </footer>
+      </article>
+    ) : (
+      <!-- ===== 列表页 ===== -->
+      <>
+        <!-- 头部 -->
+        <header class="hero" id="heroSection">
+          <div class="hero-decor">
+            <span class="hero-decor-flower">🌸</span>
+            <span class="hero-decor-heart" id="heroCenterHeart">💗</span>
+            <span class="hero-decor-flower">🌸</span>
+          </div>
+          <div class="hero-date-badge">
+            <span class="hero-date-day" id="liveDay">{new Date().getDate()}</span>
+            <span class="hero-date-month">{new Date().getMonth() + 1} 月</span>
+          </div>
+          <h1 class="hero-title">
+            <span class="hero-title-sub">Our Love Story</span>
+            <span class="hero-title-main">恋爱日常</span>
+          </h1>
+          <p class="hero-quote" id="heroQuote">"{todayQuote}"</p>
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <div class="hero-stat-num" id="loveDaysCount">{loveDays}</div>
+              <div class="hero-stat-label">相恋天数</div>
+            </div>
+            <div class="hero-stat-divider"></div>
+            <div class="hero-stat">
+              <div class="hero-stat-num">{totalPosts}</div>
+              <div class="hero-stat-label">甜蜜瞬间</div>
+            </div>
+          </div>
 
-      {posts.length > 0 ? (
-        <div class="home-diary-list">
-          {posts.map((post, i) => {
-            const previewContent = getPreviewContent(post.content);
-            const moodDisplay = getMoodDisplay(post.excerpt);
-            const dateStr = formatDate(post.publishedAt);
-            const isEven = i % 2 === 0;
-
-            return (
-              <div class={`home-diary-card ${isEven ? "card-left" : "card-right"}`}>
-                <div class="home-diary-card-inner">
-                  {post.featuredImageKey && (
-                    <div class="home-diary-card-image">
-                      <img
-                        src={`/media/${post.featuredImageKey}`}
-                        alt={post.title}
-                        loading="lazy"
-                      />
-                      <div class="home-diary-card-image-overlay"></div>
-                    </div>
-                  )}
-                  <div class="home-diary-card-body">
-                    <div class="home-diary-card-tags">
-                      <span class="home-diary-card-mood">{moodDisplay}</span>
-                      <span class="home-diary-card-number">#{totalPosts - i}</span>
-                    </div>
-                    <h3 class="home-diary-card-title">{post.title}</h3>
-                    <p class="home-diary-card-excerpt">{previewContent}</p>
-                    <div class="home-diary-card-footer">
-                      <time class="home-diary-card-date">📅 {dateStr}</time>
-                      <a href={`/home?article=${post.slug}`} class="home-diary-card-link">
-                        阅读更多 →
-                      </a>
-                    </div>
-                  </div>
-                </div>
+          <!-- 拍立得照片墙 -->
+          <div class="hero-polaroid-wall" id="polaroidWall">
+            <div class="polaroid polaroid-1" data-polaroid>
+              <div class="polaroid-inner">
+                <div class="polaroid-img">💑</div>
+                <div class="polaroid-text">第一天</div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div class="home-empty">
-          <div class="home-empty-icon">💌</div>
-          <h3>还没有恋爱日记</h3>
-          <p>快来这里记录你们的甜蜜日常吧~</p>
-          <div class="home-empty-hearts">
-            <span>💕</span><span>💗</span><span>💖</span><span>💝</span>
+            </div>
+            <div class="polaroid polaroid-2" data-polaroid>
+              <div class="polaroid-inner">
+                <div class="polaroid-img">💕</div>
+                <div class="polaroid-text">第一次约会</div>
+              </div>
+            </div>
+            <div class="polaroid polaroid-3" data-polaroid>
+              <div class="polaroid-inner">
+                <div class="polaroid-img">💗</div>
+                <div class="polaroid-text">永远爱你</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-scroll-hint">
+            <span>下滑看我们的故事</span>
+            <span class="hero-scroll-arrow">↓</span>
+          </div>
+        </header>
+
+        <!-- 互动留言板 -->
+        <div class="love-note-wall" id="loveNoteWall">
+          <div class="love-note-wall-inner">
+            <h3 class="love-note-title">💌 留下你的悄悄话</h3>
+            <div class="love-note-input-row">
+              <input type="text" id="loveNoteInput" class="love-note-input" placeholder="写一句想对TA说的话..." maxlength="80" />
+              <button id="loveNoteSend" class="love-note-send">发送 💕</button>
+            </div>
+            <div class="love-note-list" id="loveNoteList">
+              <div class="love-note-item">
+                <span class="love-note-avatar">👦</span>
+                <span class="love-note-text">我会一直陪着你</span>
+                <span class="love-note-heart">❤️</span>
+              </div>
+              <div class="love-note-item">
+                <span class="love-note-avatar">👧</span>
+                <span class="love-note-text">你是我的小太阳</span>
+                <span class="love-note-heart">☀️</span>
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {totalPages > 1 && (
-        <div class="home-pagination">
-          {page > 1 && (
-            <a href={`/home?page=${page - 1}`} class="home-page-btn">
-              ← 上一页
-            </a>
-          )}
-          <span class="home-page-info">{page} / {totalPages}</span>
-          {page < totalPages && (
-            <a href={`/home?page=${page + 1}`} class="home-page-btn">
-              下一页 →
-            </a>
-          )}
-        </div>
-      )}
-    </main>
+        <!-- 日记列表 -->
+        <main class="main">
+          <div class="section-head">
+            <h2 class="section-title">📖 我们的故事</h2>
+            <p class="section-desc">每一个瞬间，都值得被珍藏</p>
+          </div>
 
-    <!-- 底部告白 -->
-    <footer class="home-footer">
-      <div class="home-footer-hearts">
-        <span>❤️</span><span>💕</span><span>💗</span><span>💖</span><span>💝</span><span>❤️</span>
-      </div>
-      <p class="home-footer-text">JY先生 ❤️ JX女士</p>
-      <p class="home-footer-sub">从 2026年3月21日 开始，一直爱下去</p>
-    </footer>
+          {posts.length > 0 ? (
+            <div class="diary-grid">
+              {posts.map((post, i) => {
+                const previewContent = getPreviewContent(post.content);
+                const moodDisplay = getMoodDisplay(post.excerpt);
+                const dateStr = formatDate(post.publishedAt);
+
+                return (
+                  <article class="diary-card" data-card>
+                    <a href={`/home?article=${post.slug}`} class="diary-card-link">
+                      {post.featuredImageKey ? (
+                        <div class="diary-card-image">
+                          <img src={`/media/${post.featuredImageKey}`} alt={post.title} loading="lazy" />
+                          <div class="diary-card-mood-tag">{moodDisplay}</div>
+                          <div class="diary-card-image-heart">💗</div>
+                        </div>
+                      ) : (
+                        <div class="diary-card-image diary-card-image-placeholder">
+                          <span class="diary-card-placeholder-emoji">💌</span>
+                          <div class="diary-card-mood-tag">{moodDisplay}</div>
+                          <div class="diary-card-image-heart">💗</div>
+                        </div>
+                      )}
+                      <div class="diary-card-body">
+                        <div class="diary-card-meta">
+                          <span class="diary-card-date">📅 {dateStr}</span>
+                          <span class="diary-card-num">#{totalPosts - i}</span>
+                        </div>
+                        <h3 class="diary-card-title">{post.title}</h3>
+                        <p class="diary-card-excerpt">{previewContent}</p>
+                        <span class="diary-card-readmore">阅读更多 →</span>
+                      </div>
+                    </a>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div class="empty">
+              <span class="empty-icon">💌</span>
+              <h3>还没有恋爱日记</h3>
+              <p>快来记录你们的甜蜜日常吧~</p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div class="pagination">
+              {page > 1 && <a href={`/home?page=${page - 1}`} class="page-btn">← 上一页</a>}
+              <span class="page-info">{page} / {totalPages}</span>
+              {page < totalPages && <a href={`/home?page=${page + 1}`} class="page-btn">下一页 →</a>}
+            </div>
+          )}
+        </main>
+
+        <!-- 底部 -->
+        <footer class="footer">
+          <div class="footer-hearts">❤️ 💕 💗 💖 💝</div>
+          <p class="footer-text">JY先生 ❤️ JX女士</p>
+          <p class="footer-sub">从 2026年3月21日 开始，一直爱下去</p>
+        </footer>
+      </>
+    )}
   </div>
 
   <div id="heartContainer"></div>
@@ -241,415 +327,710 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
 
 <style is:global>
   :root {
-    --home-pink: #ff6b9d;
-    --home-pink-light: #ffb6ce;
-    --home-pink-dark: #e8557d;
-    --home-purple: #c4a0ff;
-    --home-orange: #ffb088;
-    --home-bg: #0a0a1a;
-    --home-card-bg: rgba(255, 240, 245, 0.03);
-    --home-text: #f0e8f4;
-    --home-text-muted: #999;
+    --pink-50: #fff5f7;
+    --pink-100: #ffe4ea;
+    --pink-200: #ffb6ce;
+    --pink-300: #ff87b5;
+    --pink-400: #ff6b9d;
+    --pink-500: #f05585;
+    --text-dark: #4a3040;
+    --text-mid: #7a6070;
+    --text-light: #b090a0;
+    --white: #ffffff;
+    --shadow-sm: 0 2px 12px rgba(255, 107, 157, 0.06);
+    --shadow-md: 0 8px 32px rgba(255, 107, 157, 0.1);
+    --shadow-lg: 0 16px 48px rgba(255, 107, 157, 0.12);
   }
 
   .home-page {
     min-height: 100vh;
-    background: linear-gradient(180deg, #0a0a1a 0%, #1a1025 30%, #0d0d1a 60%, #0a0a1a 100%);
-    color: var(--home-text);
+    background: linear-gradient(180deg, #fff5f7 0%, #ffffff 20%, #fff8fa 50%, #ffffff 100%);
+    color: var(--text-dark);
     overflow-x: hidden;
+    font-family: "Georgia", "Noto Serif SC", serif;
   }
 
-  /* ===== 头部大图 ===== */
-  .home-hero {
+  /* ===== 头部 ===== */
+  .hero {
     position: relative;
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    overflow: hidden;
-  }
-
-  .home-hero-bg {
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 30% 20%, rgba(255, 107, 157, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 70% 60%, rgba(196, 160, 255, 0.06) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 80%, rgba(255, 176, 136, 0.05) 0%, transparent 50%);
-    pointer-events: none;
-  }
-
-  .home-hero-stars {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .hero-star {
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-    animation: starTwinkle 3s ease-in-out infinite;
-  }
-
-  @keyframes starTwinkle {
-    0%, 100% { opacity: 0.3; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.5); }
-  }
-
-  .home-hero-content {
-    position: relative;
-    z-index: 1;
     padding: 2rem;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(255, 182, 206, 0.12) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(255, 107, 157, 0.06) 0%, transparent 50%);
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><text y='20' font-size='20'>💕</text></svg>") 12 12, auto;
   }
 
-  .home-hero-date {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 0.4rem;
-    margin-bottom: 1rem;
-  }
-
-  .home-hero-day {
-    font-size: 3rem;
-    font-weight: 900;
-    background: linear-gradient(135deg, #ff6b9d, #ffb6ce);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1;
-  }
-
-  .home-hero-month {
-    font-size: 1.2rem;
-    color: #ccc;
-    font-weight: 500;
-  }
-
-  .home-hero-weekday {
-    font-size: 0.85rem;
-    color: #888;
-    margin-left: 0.3rem;
-  }
-
-  .home-hero-title {
-    font-size: 3rem;
-    font-weight: 900;
-    margin: 0 0 1rem;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-
-  .home-hero-title-line {
-    display: block;
-  }
-
-  .home-hero-title-line:first-child {
-    font-size: 2rem;
-    color: #ddd;
-  }
-
-  .love-gradient-text {
-    background: linear-gradient(135deg, #ff6b9d 0%, #c4a0ff 40%, #ffb6ce 70%, #ff6b9d 100%);
-    background-size: 300% 300%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: loveGradientShift 5s ease-in-out infinite;
-    font-size: 3.5rem;
-  }
-
-  @keyframes loveGradientShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
-  .home-hero-quote {
-    font-size: 1rem;
-    color: #aaa;
-    font-style: italic;
-    margin: 1.5rem 0;
-    padding: 0 1rem;
-    line-height: 1.6;
-  }
-
-  .home-hero-stats {
+  .hero-decor {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    margin-top: 2rem;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    animation: heroDecorFloat 3s ease-in-out infinite;
   }
 
-  .home-hero-stat {
-    text-align: center;
+  .hero-decor-flower {
+    animation: heroFlowerSpin 4s ease-in-out infinite;
   }
 
-  .home-hero-stat-number {
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--home-pink);
-    font-variant-numeric: tabular-nums;
+  .hero-decor-heart {
+    animation: heroHeartBeat 1.2s ease-in-out infinite;
+    cursor: pointer;
+    user-select: none;
   }
 
-  .home-hero-stat-label {
-    font-size: 0.8rem;
-    color: #888;
-    letter-spacing: 0.06em;
+  @keyframes heroDecorFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
 
-  .home-hero-stat-heart {
-    font-size: 2rem;
-    animation: homeHeartBeat 1.2s ease-in-out infinite;
+  @keyframes heroFlowerSpin {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(10deg); }
+    75% { transform: rotate(-10deg); }
   }
 
-  @keyframes homeHeartBeat {
+  @keyframes heroHeartBeat {
     0%, 100% { transform: scale(1); }
-    14% { transform: scale(1.3); }
+    14% { transform: scale(1.25); }
     28% { transform: scale(1); }
-    42% { transform: scale(1.3); }
+    42% { transform: scale(1.25); }
     56% { transform: scale(1); }
   }
 
-  .home-hero-scroll {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
+  .hero-date-badge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    padding: 0.5rem 1.2rem;
+    background: rgba(255, 107, 157, 0.06);
+    border: 1px solid rgba(255, 107, 157, 0.12);
+    border-radius: 999px;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .hero-date-badge:hover {
+    background: rgba(255, 107, 157, 0.1);
+    transform: scale(1.04);
+  }
+
+  .hero-date-day {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--pink-400);
+    line-height: 1;
+  }
+
+  .hero-date-month {
+    font-size: 0.9rem;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  .hero-title {
+    margin: 0 0 1rem;
+  }
+
+  .hero-title-sub {
+    display: block;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    color: var(--text-light);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    font-family: system-ui, sans-serif;
+  }
+
+  .hero-title-main {
+    display: block;
+    font-size: 3rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ff6b9d 0%, #e8557d 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.04em;
+  }
+
+  .hero-quote {
+    font-size: 1rem;
+    color: var(--text-light);
+    font-style: italic;
+    margin: 1.2rem 0 2rem;
+    max-width: 400px;
+    line-height: 1.7;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+  }
+
+  .hero-quote:hover {
+    color: var(--pink-400);
+    transform: scale(1.03);
+  }
+
+  .hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .hero-stat {
+    text-align: center;
+  }
+
+  .hero-stat-num {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--pink-400);
+    font-variant-numeric: tabular-nums;
+    transition: all 0.3s ease;
+  }
+
+  .hero-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    letter-spacing: 0.06em;
+    margin-top: 0.2rem;
+  }
+
+  .hero-stat-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255, 107, 157, 0.12);
+  }
+
+  /* ===== 拍立得照片墙 ===== */
+  .hero-polaroid-wall {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .polaroid {
+    background: var(--white);
+    padding: 0.5rem 0.5rem 1rem;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    transform: rotate(-3deg);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    animation: polaroidFloat 4s ease-in-out infinite;
+  }
+
+  .polaroid:nth-child(2) {
+    transform: rotate(2deg);
+    animation-delay: 0.5s;
+    margin-top: 0.5rem;
+  }
+
+  .polaroid:nth-child(3) {
+    transform: rotate(-1deg);
+    animation-delay: 1s;
+  }
+
+  @keyframes polaroidFloat {
+    0%, 100% { transform: rotate(-3deg) translateY(0); }
+    50% { transform: rotate(-3deg) translateY(-8px); }
+  }
+
+  .polaroid:nth-child(2) {
+    animation-name: polaroidFloat2;
+  }
+
+  @keyframes polaroidFloat2 {
+    0%, 100% { transform: rotate(2deg) translateY(0); }
+    50% { transform: rotate(2deg) translateY(-8px); }
+  }
+
+  .polaroid:nth-child(3) {
+    animation-name: polaroidFloat3;
+  }
+
+  @keyframes polaroidFloat3 {
+    0%, 100% { transform: rotate(-1deg) translateY(0); }
+    50% { transform: rotate(-1deg) translateY(-8px); }
+  }
+
+  .polaroid:hover {
+    transform: rotate(0deg) scale(1.12) !important;
+    box-shadow: 0 12px 32px rgba(255, 107, 157, 0.15);
+    z-index: 10;
+    animation-play-state: paused;
+  }
+
+  .polaroid-inner {
+    width: 90px;
+    height: 100px;
+    background: linear-gradient(135deg, #fff0f3, #ffe4ea);
+    border-radius: 2px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.4rem;
-    color: #666;
-    font-size: 0.8rem;
-    animation: homeScrollBounce 2s ease-in-out infinite;
+    justify-content: center;
+    gap: 0.3rem;
   }
 
-  @keyframes homeScrollBounce {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(8px); }
+  .polaroid-img {
+    font-size: 2.2rem;
   }
 
-  .home-hero-scroll-arrow {
+  .polaroid-text {
+    font-size: 0.65rem;
+    color: var(--text-mid);
+    letter-spacing: 0.04em;
+  }
+
+  /* ===== 悄悄话留言板 ===== */
+  .love-note-wall {
+    max-width: 700px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+  }
+
+  .love-note-wall-inner {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 1.8rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(255, 182, 206, 0.15);
+  }
+
+  .love-note-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--pink-500);
+    margin: 0 0 1rem;
+    text-align: center;
+  }
+
+  .love-note-input-row {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .love-note-input {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border: 1px solid rgba(255, 182, 206, 0.3);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    color: var(--text-dark);
+  }
+
+  .love-note-input:focus {
+    border-color: var(--pink-400);
+    box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.06);
+  }
+
+  .love-note-input::placeholder {
+    color: var(--text-light);
+  }
+
+  .love-note-send {
+    padding: 0.7rem 1.4rem;
+    background: linear-gradient(135deg, #ff6b9d, #f05585);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+  }
+
+  .love-note-send:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(255, 107, 157, 0.25);
+  }
+
+  .love-note-send:active {
+    transform: scale(0.96);
+  }
+
+  .love-note-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .love-note-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.8rem;
+    background: rgba(255, 107, 157, 0.03);
+    border-radius: 10px;
+    animation: noteSlideIn 0.4s ease;
+  }
+
+  @keyframes noteSlideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .love-note-avatar {
     font-size: 1.2rem;
+    flex-shrink: 0;
   }
 
-  /* ===== 日记列表 ===== */
-  .home-main {
-    max-width: 900px;
+  .love-note-text {
+    flex: 1;
+    font-size: 0.88rem;
+    color: var(--text-mid);
+  }
+
+  .love-note-heart {
+    font-size: 0.9rem;
+    animation: heroHeartBeat 2s ease-in-out infinite;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* ===== 日记网格 ===== */
+  .main {
+    max-width: 1000px;
     margin: 0 auto 4rem;
     padding: 0 1.5rem;
   }
 
-  .home-section-header {
+  .section-head {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
   }
 
-  .home-section-title {
-    font-size: 2rem;
-    font-weight: 800;
-    margin: 0 0 0.5rem;
-    color: #f0e8f4;
+  .section-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 0.4rem;
   }
 
-  .home-section-desc {
-    color: var(--home-text-muted);
-    font-size: 0.95rem;
+  .section-desc {
+    color: var(--text-light);
+    font-size: 0.9rem;
     margin: 0;
   }
 
-  .home-diary-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
+  .diary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
   }
 
-  .home-diary-card {
+  .diary-card {
+    background: var(--white);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(255, 182, 206, 0.2);
+    transition: all 0.4s ease;
+    animation: cardFadeIn 0.6s ease forwards;
     opacity: 0;
-    animation: homeCardFadeIn 0.8s ease forwards;
+    cursor: pointer;
   }
 
-  .home-diary-card:nth-child(1) { animation-delay: 0.1s; }
-  .home-diary-card:nth-child(2) { animation-delay: 0.2s; }
-  .home-diary-card:nth-child(3) { animation-delay: 0.3s; }
-  .home-diary-card:nth-child(4) { animation-delay: 0.4s; }
-  .home-diary-card:nth-child(5) { animation-delay: 0.5s; }
-  .home-diary-card:nth-child(6) { animation-delay: 0.6s; }
+  .diary-card:nth-child(1) { animation-delay: 0.05s; }
+  .diary-card:nth-child(2) { animation-delay: 0.1s; }
+  .diary-card:nth-child(3) { animation-delay: 0.15s; }
+  .diary-card:nth-child(4) { animation-delay: 0.2s; }
+  .diary-card:nth-child(5) { animation-delay: 0.25s; }
+  .diary-card:nth-child(6) { animation-delay: 0.3s; }
 
-  @keyframes homeCardFadeIn {
-    from { opacity: 0; transform: translateY(30px); }
+  @keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(24px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .home-diary-card-inner {
-    display: flex;
-    background: rgba(255, 240, 245, 0.025);
-    border: 1px solid rgba(255, 180, 200, 0.06);
-    border-radius: 20px;
-    overflow: hidden;
-    transition: all 0.4s ease;
+  .diary-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(255, 107, 157, 0.3);
   }
 
-  .home-diary-card-inner:hover {
-    border-color: rgba(255, 107, 157, 0.2);
-    box-shadow: 0 16px 48px rgba(255, 107, 157, 0.06);
-    transform: translateY(-4px);
+  .diary-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
   }
 
-  .card-right .home-diary-card-inner {
-    flex-direction: row-reverse;
-  }
-
-  .home-diary-card-image {
-    flex: 0 0 280px;
+  .diary-card-image {
     position: relative;
+    width: 100%;
+    height: 220px;
     overflow: hidden;
+    background: linear-gradient(135deg, #fff0f3, #ffe4ea);
   }
 
-  .home-diary-card-image img {
+  .diary-card-image img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.6s ease;
   }
 
-  .home-diary-card-inner:hover .home-diary-card-image img {
-    transform: scale(1.08);
+  .diary-card:hover .diary-card-image img {
+    transform: scale(1.06);
   }
 
-  .home-diary-card-image-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-      to right,
-      rgba(10, 10, 26, 0) 0%,
-      rgba(10, 10, 26, 0.5) 100%
-    );
-  }
-
-  .card-right .home-diary-card-image-overlay {
-    background: linear-gradient(
-      to left,
-      rgba(10, 10, 26, 0) 0%,
-      rgba(10, 10, 26, 0.5) 100%
-    );
-  }
-
-  .home-diary-card-body {
-    flex: 1;
-    padding: 1.5rem 1.8rem;
+  .diary-card-image-placeholder {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
   }
 
-  .home-diary-card-tags {
+  .diary-card-placeholder-emoji {
+    font-size: 3rem;
+    opacity: 0.6;
+  }
+
+  .diary-card-mood-tag {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--pink-500);
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    z-index: 2;
+  }
+
+  .diary-card-image-heart {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 2.5rem;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .diary-card:active .diary-card-image-heart {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  .diary-card-body {
+    padding: 1.2rem 1.3rem 1.4rem;
+  }
+
+  .diary-card-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.5rem;
   }
 
-  .home-diary-card-mood {
+  .diary-card-date {
     font-size: 0.78rem;
-    padding: 0.25rem 0.7rem;
-    background: rgba(255, 107, 157, 0.1);
-    border-radius: 999px;
-    color: var(--home-pink);
+    color: var(--text-light);
+  }
+
+  .diary-card-num {
+    font-size: 0.72rem;
+    color: var(--pink-300);
+    font-family: monospace;
     font-weight: 500;
   }
 
-  .home-diary-card-number {
-    font-size: 0.75rem;
-    color: #666;
-    font-family: monospace;
+  .diary-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0 0 0.4rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
-  .home-diary-card-title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #f0e0ec;
-    margin: 0 0 0.5rem;
-    line-height: 1.4;
-  }
-
-  .home-diary-card-excerpt {
-    font-size: 0.9rem;
-    color: #999;
-    line-height: 1.6;
-    margin: 0 0 1rem;
-  }
-
-  .home-diary-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 0.8rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .home-diary-card-date {
-    font-size: 0.82rem;
-    color: #888;
-  }
-
-  .home-diary-card-link {
+  .diary-card-excerpt {
     font-size: 0.85rem;
-    color: var(--home-pink);
-    text-decoration: none;
+    color: var(--text-light);
+    line-height: 1.6;
+    margin: 0 0 0.8rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .diary-card-readmore {
+    font-size: 0.82rem;
+    color: var(--pink-400);
     font-weight: 500;
     transition: all 0.3s ease;
   }
 
-  .home-diary-card-link:hover {
-    color: var(--home-pink-light);
+  .diary-card:hover .diary-card-readmore {
     transform: translateX(4px);
     display: inline-block;
   }
 
-  /* ===== 空状态 ===== */
-  .home-empty {
+  /* ===== 详情页 ===== */
+  .detail-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  .detail-hero {
     text-align: center;
-    padding: 5rem 1rem;
+    margin-bottom: 2rem;
   }
 
-  .home-empty-icon {
-    font-size: 4rem;
+  .detail-hero-badge {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    background: rgba(255, 107, 157, 0.06);
+    border: 1px solid rgba(255, 107, 157, 0.15);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    color: var(--pink-500);
     margin-bottom: 1rem;
-    animation: homeFloat 3s ease-in-out infinite;
   }
 
-  @keyframes homeFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+  .detail-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 0.6rem;
+    line-height: 1.3;
   }
 
-  .home-empty h3 {
-    font-size: 1.4rem;
-    color: #ddd;
-    margin: 0 0 0.5rem;
-  }
-
-  .home-empty p {
-    color: #888;
-    margin: 0 0 1.5rem;
-  }
-
-  .home-empty-hearts {
+  .detail-meta {
     display: flex;
-    gap: 0.6rem;
+    gap: 1.2rem;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .detail-image-wrap {
+    margin-bottom: 2rem;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+
+  .detail-image {
+    width: 100%;
+    display: block;
+  }
+
+  .detail-body {
+    margin-bottom: 2rem;
+  }
+
+  .detail-content {
+    font-size: 1.02rem;
+    color: #5a4050;
+    line-height: 1.9;
+  }
+
+  .detail-content :global(h2),
+  .detail-content :global(h3) {
+    color: var(--pink-500);
+    margin-top: 1.6rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .detail-content :global(p) {
+    margin: 0 0 1rem;
+  }
+
+  .detail-content :global(img) {
+    max-width: 100%;
+    border-radius: 12px;
+    margin: 1rem 0;
+  }
+
+  .detail-content :global(blockquote) {
+    border-left: 3px solid var(--pink-300);
+    margin: 1.2rem 0;
+    padding: 0.6rem 1.2rem;
+    background: rgba(255, 107, 157, 0.03);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-mid);
+    font-style: italic;
+  }
+
+  .detail-footer {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 182, 206, 0.3);
+  }
+
+  .detail-back-btn {
+    display: inline-flex;
+    padding: 0.6rem 1.4rem;
+    border: 1px solid rgba(255, 107, 157, 0.2);
+    border-radius: 999px;
+    color: var(--pink-500);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+  }
+
+  .detail-back-btn:hover {
+    background: rgba(255, 107, 157, 0.04);
+    border-color: var(--pink-400);
+  }
+
+  .detail-footer-hearts {
+    color: var(--pink-300);
+    letter-spacing: 0.3rem;
+  }
+
+  /* ===== 空状态 ===== */
+  .empty {
+    text-align: center;
+    padding: 4rem 1rem;
+  }
+
+  .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .empty h3 {
+    font-size: 1.2rem;
+    color: var(--text-mid);
+    margin: 0 0 0.4rem;
+  }
+
+  .empty p {
+    color: var(--text-light);
+    margin: 0;
   }
 
   /* ===== 分页 ===== */
-  .home-pagination {
+  .pagination {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -657,52 +1038,50 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
     padding: 2rem 0;
   }
 
-  .home-page-btn {
-    padding: 0.6rem 1.2rem;
+  .page-btn {
+    padding: 0.5rem 1rem;
     border: 1px solid rgba(255, 107, 157, 0.2);
     border-radius: 8px;
-    color: var(--home-pink);
+    color: var(--pink-400);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     transition: all 0.3s ease;
   }
 
-  .home-page-btn:hover {
-    background: rgba(255, 107, 157, 0.1);
-    border-color: var(--home-pink);
+  .page-btn:hover {
+    background: rgba(255, 107, 157, 0.04);
+    border-color: var(--pink-400);
   }
 
-  .home-page-info {
-    font-size: 0.9rem;
-    color: #888;
+  .page-info {
+    font-size: 0.85rem;
+    color: var(--text-light);
   }
 
   /* ===== 底部 ===== */
-  .home-footer {
+  .footer {
     text-align: center;
-    padding: 4rem 1rem 3rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 3rem 1rem;
+    border-top: 1px solid rgba(255, 182, 206, 0.2);
   }
 
-  .home-footer-hearts {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    font-size: 1.4rem;
-    margin-bottom: 1rem;
-    animation: homeFloat 3s ease-in-out infinite;
+  .footer-hearts {
+    font-size: 1.3rem;
+    letter-spacing: 0.3rem;
+    color: var(--pink-300);
+    margin-bottom: 0.8rem;
   }
 
-  .home-footer-text {
-    font-size: 1.1rem;
-    color: var(--home-pink);
+  .footer-text {
+    font-size: 1rem;
+    color: var(--pink-500);
     font-weight: 600;
-    margin: 0 0 0.3rem;
+    margin: 0 0 0.2rem;
   }
 
-  .home-footer-sub {
-    font-size: 0.85rem;
-    color: #888;
+  .footer-sub {
+    font-size: 0.82rem;
+    color: var(--text-light);
     margin: 0;
   }
 
@@ -710,9 +1089,9 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
   .fall-heart {
     position: fixed;
     top: -10%;
-    color: #ff87a5;
-    font-size: 18px;
-    animation: fall 6s linear infinite;
+    color: #ffb6ce;
+    font-size: 16px;
+    animation: fall 7s linear infinite;
     opacity: 0.5;
     pointer-events: none;
     z-index: 999;
@@ -720,106 +1099,65 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
 
   .click-float-heart {
     position: absolute;
-    color: #ff5e8c;
-    font-size: 28px;
+    color: #ff6b9d;
+    font-size: 26px;
     pointer-events: none;
     animation: floatUp 1s ease-out forwards;
     z-index: 999;
   }
 
+  .heart-particle {
+    position: absolute;
+    pointer-events: none;
+    z-index: 998;
+    animation: heartParticle 0.8s ease-out forwards;
+  }
+
   @keyframes fall {
-    0% {
-      transform: translateY(0) rotate(0deg);
-      opacity: 0.7;
-    }
-    100% {
-      transform: translateY(100vh) rotate(360deg);
-      opacity: 0;
-    }
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+    100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
   }
 
   @keyframes floatUp {
-    0% {
-      transform: translateY(0) scale(0.8);
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(-180px) scale(1.2);
-      opacity: 0;
-    }
+    0% { transform: translateY(0) scale(0.8); opacity: 1; }
+    100% { transform: translateY(-160px) scale(1.2); opacity: 0; }
   }
 
-  /* ===== 响应式 ===== */
-  @media (max-width: 768px) {
-    .home-hero-title {
-      font-size: 2rem;
-    }
-    .love-gradient-text {
-      font-size: 2.4rem;
-    }
-    .home-hero-title-line:first-child {
-      font-size: 1.4rem;
-    }
-    .home-hero-day {
-      font-size: 2.2rem;
-    }
-    .home-hero-stat-number {
-      font-size: 1.5rem;
-    }
+  @keyframes heartParticle {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  }
 
-    .home-diary-card-inner {
-      flex-direction: column !important;
-    }
-    .home-diary-card-image {
-      flex: 0 0 200px;
-      width: 100%;
-    }
-    .home-diary-card-image-overlay {
-      background: linear-gradient(to bottom, rgba(10, 10, 26, 0) 0%, rgba(10, 10, 26, 0.5) 100%) !important;
-    }
-    .home-diary-card-body {
-      padding: 1.2rem;
-    }
+  @media (max-width: 768px) {
+    .hero-title-main { font-size: 2.2rem; }
+    .hero-stat-num { font-size: 1.6rem; }
+    .diary-grid { grid-template-columns: 1fr; }
+    .detail-title { font-size: 1.5rem; }
+    .polaroid-inner { width: 70px; height: 80px; }
+    .polaroid-img { font-size: 1.6rem; }
+    .love-note-input-row { flex-direction: column; }
   }
 </style>
 
 <script>
-  // 星星生成
-  const starsContainer = document.getElementById("heroStars");
-  if (starsContainer) {
-    for (let i = 0; i < 50; i++) {
-      const star = document.createElement("div");
-      star.className = "hero-star";
-      star.style.left = Math.random() * 100 + "%";
-      star.style.top = Math.random() * 100 + "%";
-      star.style.width = Math.random() * 3 + 1 + "px";
-      star.style.height = star.style.width;
-      star.style.animationDelay = Math.random() * 3 + "s";
-      star.style.animationDuration = Math.random() * 3 + 2 + "s";
-      starsContainer.appendChild(star);
-    }
-  }
-
-  // 爱心飘落特效
+  // ===== 爱心容器 =====
   const heartContainer = document.getElementById("heartContainer");
 
+  // ===== 爱心飘落 =====
   function createFallHeart() {
     const heart = document.createElement("div");
     heart.className = "fall-heart";
-    heart.innerHTML = ["❤️", "💕", "💗", "💖", "🩷", "💝", "🌸", "✨"][Math.floor(Math.random() * 8)];
+    heart.innerHTML = ["❤️", "💕", "💗", "💖", "🩷", "🌸", "✨", "💝"][Math.floor(Math.random() * 8)];
     heart.style.left = Math.random() * 100 + "vw";
-    heart.style.animationDuration = Math.random() * 4 + 4 + "s";
-    heart.style.fontSize = Math.random() * 14 + 12 + "px";
+    heart.style.animationDuration = Math.random() * 5 + 5 + "s";
+    heart.style.fontSize = Math.random() * 12 + 12 + "px";
     heartContainer?.appendChild(heart);
-    setTimeout(() => heart.remove(), 8000);
+    setTimeout(() => heart.remove(), 9000);
   }
+  setInterval(createFallHeart, 600);
+  for (let i = 0; i < 6; i++) setTimeout(createFallHeart, i * 400);
 
-  setInterval(createFallHeart, 500);
-  for (let i = 0; i < 8; i++) {
-    setTimeout(createFallHeart, i * 300);
-  }
-
-  // 点击爱心
+  // ===== 点击爱心 =====
   document.body.addEventListener("click", (e) => {
     const heart = document.createElement("div");
     heart.className = "click-float-heart";
@@ -830,7 +1168,7 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
     setTimeout(() => heart.remove(), 1000);
   });
 
-  // 双击爱心爆炸
+  // ===== 双击爱心爆炸 =====
   document.body.addEventListener("dblclick", (e) => {
     const emojis = ["💗", "💖", "💕", "💝", "🩷", "🌸", "✨", "💘"];
     for (let i = 0; i < 12; i++) {
@@ -838,12 +1176,178 @@ const todayQuote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
         const heart = document.createElement("div");
         heart.className = "click-float-heart";
         heart.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
-        heart.style.fontSize = Math.random() * 28 + 24 + "px";
-        heart.style.left = e.pageX + (Math.random() * 100 - 50) + "px";
+        heart.style.fontSize = Math.random() * 24 + 22 + "px";
+        heart.style.left = e.pageX + (Math.random() * 90 - 45) + "px";
         heart.style.top = e.pageY + "px";
         heartContainer?.appendChild(heart);
-        setTimeout(() => heart.remove(), 1500);
+        setTimeout(() => heart.remove(), 1400);
       }, i * 60);
     }
+  });
+
+  // ===== 鼠标移动粒子轨迹 =====
+  let lastParticleTime = 0;
+  document.body.addEventListener("mousemove", (e) => {
+    const now = Date.now();
+    if (now - lastParticleTime < 80) return;
+    lastParticleTime = now;
+
+    const particle = document.createElement("div");
+    particle.className = "heart-particle";
+    particle.innerHTML = ["💕", "✨", "💗", "🌸", "🩷"][Math.floor(Math.random() * 5)];
+    particle.style.left = e.pageX + "px";
+    particle.style.top = e.pageY + "px";
+    particle.style.fontSize = Math.random() * 10 + 10 + "px";
+    particle.style.setProperty("--dx", (Math.random() * 60 - 30) + "px");
+    particle.style.setProperty("--dy", (Math.random() * -60 - 20) + "px");
+    heartContainer?.appendChild(particle);
+    setTimeout(() => particle.remove(), 800);
+  });
+
+  // ===== 中心爱心点击变色 =====
+  const centerHeart = document.getElementById("heroCenterHeart");
+  if (centerHeart) {
+    const heartColors = ["💗", "💖", "💝", "💘", "❤️‍🔥", "🩷", "💕"];
+    let colorIndex = 0;
+    centerHeart.addEventListener("click", (e) => {
+      e.stopPropagation();
+      colorIndex = (colorIndex + 1) % heartColors.length;
+      centerHeart.innerHTML = heartColors[colorIndex];
+      // 点击时放大动画
+      centerHeart.style.transform = "scale(1.5)";
+      setTimeout(() => { centerHeart.style.transform = "scale(1)"; }, 200);
+
+      // 周围冒出爱心
+      for (let i = 0; i < 8; i++) {
+        const spark = document.createElement("div");
+        spark.className = "heart-particle";
+        spark.innerHTML = ["💕", "✨", "💗"][Math.floor(Math.random() * 3)];
+        spark.style.left = (centerHeart.getBoundingClientRect().left + centerHeart.offsetWidth / 2) + "px";
+        spark.style.top = (centerHeart.getBoundingClientRect().top + centerHeart.offsetHeight / 2) + "px";
+        spark.style.fontSize = "18px";
+        spark.style.setProperty("--dx", (Math.random() * 100 - 50) + "px");
+        spark.style.setProperty("--dy", (Math.random() * -100 - 20) + "px");
+        heartContainer?.appendChild(spark);
+        setTimeout(() => spark.remove(), 900);
+      }
+    });
+  }
+
+  // ===== 格言点击切换 =====
+  const heroQuote = document.getElementById("heroQuote");
+  if (heroQuote) {
+    const quotes = [
+      "你是我一生只会遇见一次的惊喜",
+      "有你的每一天，都是情人节",
+      "世间万物，不及你眉眼半分",
+      "想和你一起，看遍世间所有浪漫",
+      "遇见你之后，我的世界有了光",
+      "你是我的今天，也是我的明天",
+      "爱不是相互凝望，而是一起朝同一个方向看",
+      "我在人间贩卖黄昏，只为收集世间温柔去见你",
+      "你一笑，我的世界就亮了",
+      "和你在一起，连空气都是甜的",
+    ];
+    let quoteIdx = 0;
+    heroQuote.addEventListener("click", (e) => {
+      e.stopPropagation();
+      quoteIdx = (quoteIdx + 1) % quotes.length;
+      heroQuote.innerHTML = `"${quotes[quoteIdx]}"`;
+      heroQuote.style.transform = "scale(1.08)";
+      setTimeout(() => { heroQuote.style.transform = "scale(1)"; }, 200);
+    });
+  }
+
+  // ===== 拍立得照片点击翻转 =====
+  document.querySelectorAll("[data-polaroid]").forEach((p) => {
+    const emojis = ["💑", "💕", "💗", "💖", "💝", "🌹", "🎁", "💘", "🥰", "✨"];
+    p.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const img = p.querySelector(".polaroid-img");
+      if (img) {
+        const current = img.innerHTML;
+        let newEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        while (newEmoji === current && emojis.length > 1) {
+          newEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        }
+        img.innerHTML = newEmoji;
+      }
+      p.style.transform = "rotate(0deg) scale(1.2)";
+      setTimeout(() => { p.style.transform = ""; }, 300);
+    });
+  });
+
+  // ===== 悄悄话留言板 =====
+  const noteInput = document.getElementById("loveNoteInput");
+  const noteSend = document.getElementById("loveNoteSend");
+  const noteList = document.getElementById("loveNoteList");
+
+  function addLoveNote(text) {
+    if (!text.trim() || !noteList) return;
+    const avatars = ["👦", "👧", "🐻", "🐰", "🦊", "🐱", "🐶", "🌸"];
+    const hearts = ["❤️", "💕", "💗", "💖", "💝", "🩷"];
+    const item = document.createElement("div");
+    item.className = "love-note-item";
+    item.innerHTML = `
+      <span class="love-note-avatar">${avatars[Math.floor(Math.random() * avatars.length)]}</span>
+      <span class="love-note-text">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
+      <span class="love-note-heart">${hearts[Math.floor(Math.random() * hearts.length)]}</span>
+    `;
+    noteList.insertBefore(item, noteList.firstChild);
+
+    // 点击爱心变色
+    const heartEl = item.querySelector(".love-note-heart");
+    heartEl?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const newHeart = hearts[Math.floor(Math.random() * hearts.length)];
+      heartEl.innerHTML = newHeart;
+    });
+
+    // 限制数量
+    while (noteList.children.length > 20) {
+      noteList.lastChild?.remove();
+    }
+
+    // 存 localStorage
+    try {
+      const notes = JSON.parse(localStorage.getItem("loveNotes") || "[]");
+      notes.unshift(text);
+      localStorage.setItem("loveNotes", JSON.stringify(notes.slice(0, 20)));
+    } catch {}
+  }
+
+  noteSend?.addEventListener("click", () => {
+    if (noteInput && noteInput.value.trim()) {
+      addLoveNote(noteInput.value.trim());
+      noteInput.value = "";
+      noteInput.focus();
+    }
+  });
+
+  noteInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      noteSend?.click();
+    }
+  });
+
+  // 加载历史留言
+  try {
+    const saved = JSON.parse(localStorage.getItem("loveNotes") || "[]");
+    saved.forEach((text) => addLoveNote(text));
+  } catch {}
+
+  // ===== 卡片长按爱心弹出 =====
+  document.querySelectorAll("[data-card]").forEach((card) => {
+    card.addEventListener("click", function(e) {
+      const heart = this.querySelector(".diary-card-image-heart");
+      if (heart) {
+        heart.style.transform = "translate(-50%, -50%) scale(1)";
+        heart.style.opacity = "1";
+        setTimeout(() => {
+          heart.style.transform = "translate(-50%, -50%) scale(0)";
+          heart.style.opacity = "0";
+        }, 500);
+      }
+    });
   });
 </script>
