@@ -43,6 +43,7 @@
 		"TURNSTILE_SITE_KEY": "0x4AAAAAACnxh79QQawnz9UI",
                                 "ADMIN_GITHUB_LOGIN": "520ssd",
                                 "AUTO_DEPLOY_GITHUB_EVENT_TYPE": "rebuild-search-index",
+                                "GITHUB_OAUTH_REDIRECT_URI": "https://jy.lovexy.ggff.net/api/auth/github/callback",
                                 "AUTO_DEPLOY_WEBHOOK_URL": "https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/fb430efb-0a76-4614-bd43-e5a4e21c2d2b",
                                 "GITHUB_OAUTH_CLIENT_ID": "Ov23liRK6wiHEee0sNsF"
 	}
