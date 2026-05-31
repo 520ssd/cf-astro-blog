@@ -97,34 +97,82 @@ const pastQuotes = [
   <div class="past-page" id="pastPage">
     <canvas id="leafCanvas" class="leaf-canvas"></canvas>
 
-    {/* ===== 时间胶囊 ===== */}
-    <div class="capsule-trigger" id="capsuleTrigger" title="打开时间胶囊">
-      <span class="capsule-trigger-icon">📷</span>
-    </div>
+    {/* ===== 浮动按钮组 ===== */}
+    <div class="floating-buttons">
+      {/* 时间胶囊 */}
+      <div class="float-btn" id="capsuleTrigger" title="时间胶囊">
+        <span class="float-btn-icon">⏳</span>
+        <span class="float-btn-label">胶囊</span>
+      </div>
 
-    {/* ===== 记忆碎片拼图按钮 ===== */}
-    <div class="puzzle-trigger" id="puzzleTrigger" title="记忆碎片拼图">
-      <span class="puzzle-trigger-icon">🧩</span>
-    </div>
+      {/* 雨声窗台 */}
+      <div class="float-btn" id="rainWindowToggle" title="雨声窗台">
+        <span class="float-btn-icon">🪟</span>
+        <span class="float-btn-label">听雨</span>
+      </div>
 
-    {/* ===== 煤油灯按钮 ===== */}
-    <div class="lamp-toggle" id="lampToggle" title="煤油灯">
-      <span>🪔</span>
-    </div>
+      {/* 旧式留声机 */}
+      <div class="float-btn" id="phonographToggle" title="旧式留声机">
+        <span class="float-btn-icon">📯</span>
+        <span class="float-btn-label">留声</span>
+      </div>
 
-    {/* ===== 沙画按钮 ===== */}
-    <div class="sand-toggle" id="sandToggle" title="沙画">
-      <span>🏜️</span>
-    </div>
+      {/* 旧电视 */}
+      <div class="float-btn" id="tvToggle" title="老电视">
+        <span class="float-btn-icon">📺</span>
+        <span class="float-btn-label">电视</span>
+      </div>
 
-    {/* ===== 煤油灯光圈 ===== */}
-    <div class="lamp-cursor-area" id="lampArea">
-      <div class="lamp-glow" id="lampGlow"></div>
+      {/* 沙画 */}
+      <div class="float-btn" id="sandToggle" title="沙画">
+        <span class="float-btn-icon">🏜️</span>
+        <span class="float-btn-label">沙画</span>
+      </div>
     </div>
 
     {/* ===== 沙画画布 ===== */}
     <canvas class="sand-canvas" id="sandCanvas"></canvas>
     <div class="sand-hint" id="sandHint">🖐️ 按住鼠标拖拽画沙，松手后慢慢消散</div>
+
+    {/* ===== 雨声窗台弹窗 ===== */}
+    <div class="rain-overlay" id="rainOverlay" style="display:none">
+      <div class="rain-window">
+        <div class="rain-glass" id="rainGlass">
+          <div class="rain-drops" id="rainDrops"></div>
+          <div class="rain-text" id="rainText">
+            <span>☔ 窗外下着雨</span>
+            <span>适合安静地回忆从前</span>
+          </div>
+        </div>
+        <div class="rain-controls">
+          <button class="rain-btn" id="rainToggle">⏯️ 暂停雨</button>
+          <button class="rain-btn" id="rainClose">关上窗户</button>
+        </div>
+      </div>
+    </div>
+
+    {/* ===== 留声机弹窗 ===== */}
+    <div class="phono-overlay" id="phonoOverlay" style="display:none">
+      <div class="phono-machine">
+        <div class="phono-turntable" id="phonoTurntable">
+          <div class="phono-disc">
+            <div class="phono-disc-label">🎵</div>
+            <div class="phono-disc-groove"></div>
+            <div class="phono-disc-groove"></div>
+          </div>
+        </div>
+        <div class="phono-horn" id="phonoHorn">
+          <div class="phono-horn-inner"></div>
+        </div>
+        <div class="phono-crank" id="phonoCrank">
+          <span>🖐️</span>
+        </div>
+        <div class="phono-now-playing" id="phonoNowPlaying">
+          <span>🎶 点击摇柄播放回忆</span>
+        </div>
+        <button class="phono-close" id="phonoClose">收起留声机</button>
+      </div>
+    </div>
 
     {detailPost ? (
       <article class="past-detail">
@@ -233,17 +281,6 @@ const pastQuotes = [
       </>
     )}
   </div>
-
-  {/* ===== 时间胶囊弹窗 ===== */}
-  <div class="capsule-overlay" id="capsuleOverlay" style="display:none">
-    <div class="capsule-modal">
-      <div class="capsule-lid"><span>📷</span></div>
-      <div class="capsule-body">
-        <div class="capsule-content" id="capsuleContent"></div>
-      </div>
-      <button class="capsule-close" id="capsuleClose">合上胶囊</button>
-    </div>
-  </div>
 </Base>
 
 <script type="application/json" id="pastPostsData">
@@ -286,110 +323,93 @@ const pastQuotes = [
     z-index: 0;
   }
 
-  /* ===== 浮动按钮们 ===== */
-  .capsule-trigger,
-  .puzzle-trigger,
-  .lamp-toggle,
-  .sand-toggle {
+  /* ===== 浮动按钮组 ===== */
+  .floating-buttons {
     position: fixed;
+    bottom: 2rem;
+    right: 2rem;
     z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .float-btn {
     width: 56px;
     height: 56px;
     background: var(--past-glass);
     backdrop-filter: blur(16px);
     border: 1px solid var(--past-border);
-    border-radius: 50%;
+    border-radius: 16px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-shadow: var(--past-shadow);
-    transition: all 0.4s ease;
-    animation: capsuleFloat 3s ease-in-out infinite;
+    transition: all 0.3s ease;
+    position: relative;
+    animation: btnFloat 3s ease-in-out infinite;
   }
-  .capsule-trigger { bottom: 2rem; right: 2rem; }
-  .puzzle-trigger { bottom: 2rem; right: 6rem; animation-delay: 0.5s; }
-  .lamp-toggle { bottom: 2rem; right: 10rem; animation-delay: 1s; }
-  .sand-toggle { bottom: 2rem; right: 14rem; animation-delay: 1.5s; }
-  .capsule-trigger:hover,
-  .puzzle-trigger:hover,
-  .lamp-toggle:hover,
-  .sand-toggle:hover { transform: scale(1.15); }
-  .capsule-trigger-icon,
-  .puzzle-trigger-icon { font-size: 1.5rem; }
-  .lamp-toggle.active { background: rgba(255,200,120,0.3); border-color: rgba(255,180,80,0.5); }
-  .sand-toggle.active { background: rgba(200,170,120,0.3); }
+  .float-btn:nth-child(1) { animation-delay: 0s; }
+  .float-btn:nth-child(2) { animation-delay: 0.4s; }
+  .float-btn:nth-child(3) { animation-delay: 0.8s; }
+  .float-btn:nth-child(4) { animation-delay: 1.2s; }
+  .float-btn:nth-child(5) { animation-delay: 1.6s; }
 
-  @keyframes capsuleFloat {
+  @keyframes btnFloat {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
+    50% { transform: translateY(-5px); }
   }
 
-  /* ===== 时间胶囊弹窗 ===== */
-  .capsule-overlay {
+  .float-btn:hover {
+    transform: scale(1.12) translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    border-color: var(--past-accent);
+  }
+
+  .float-btn-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+  }
+
+  .float-btn-label {
+    font-size: 0.55rem;
+    color: var(--past-text-light);
+    letter-spacing: 0.04em;
+    margin-top: 1px;
+  }
+
+  /* ===== 沙画 ===== */
+  .sand-canvas {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.2);
-    backdrop-filter: blur(4px);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.3s ease;
+    pointer-events: none;
+    z-index: 9998;
+    display: none;
   }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .sand-canvas.active {
+    display: block;
+    pointer-events: auto;
+  }
+  .sand-hint {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background: rgba(0,0,0,0.6);
+    color: #e8d5a3;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    pointer-events: none;
+    display: none;
+  }
+  .sand-hint.active { display: block; }
 
-  .capsule-modal {
-    background: rgba(252, 248, 240, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
-    width: 90%;
-    max-width: 400px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-    animation: modalPop 0.4s ease;
-  }
-  @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-  .capsule-lid {
-    background: linear-gradient(135deg, #d4b896, #c4a070);
-    padding: 1rem;
-    text-align: center;
-    font-size: 2rem;
-  }
-  .capsule-body {
-    padding: 1.5rem;
-    text-align: center;
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .capsule-content {
-    font-style: italic;
-    color: var(--past-text-light);
-    line-height: 1.6;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .capsule-content .capsule-item-title { font-weight: 600; color: var(--past-text); font-style: normal; }
-  .capsule-content .capsule-item-date { font-size: 0.78rem; }
-  .capsule-close {
-    width: 100%;
-    padding: 0.7rem;
-    border: none;
-    background: rgba(180,150,120,0.15);
-    color: var(--past-text-light);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.85rem;
-    transition: background 0.3s;
-  }
-  .capsule-close:hover { background: rgba(180,150,120,0.25); }
-
-  /* ===== 拼图 ===== */
-  .puzzle-overlay {
+  /* ===== 雨声窗台 ===== */
+  .rain-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.3);
@@ -400,56 +420,248 @@ const pastQuotes = [
     justify-content: center;
     animation: fadeIn 0.3s ease;
   }
-  .puzzle-board {
-    background: rgba(252,248,240,0.95);
-    border-radius: 20px;
-    padding: 1.5rem;
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .rain-window {
     width: 90%;
-    max-width: 420px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-    text-align: center;
+    max-width: 500px;
+    background: #3a3a4a;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 80px rgba(0,0,0,0.3);
+    border: 6px solid #5a4a3a;
   }
-  .puzzle-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin: 1rem 0;
-  }
-  .puzzle-piece {
-    aspect-ratio: 1;
-    background: linear-gradient(135deg, #d4b896, #c4a070);
-    border-radius: 8px;
-    cursor: pointer;
+
+  .rain-glass {
+    height: 300px;
+    background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 50%, #2a2a3a 100%);
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+  }
+
+  .rain-drops {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .rain-drop {
+    position: absolute;
+    width: 2px;
+    background: linear-gradient(180deg, transparent 0%, rgba(180,200,220,0.6) 50%, rgba(200,220,240,0.8) 100%);
+    animation: rainFall linear infinite;
+    border-radius: 0 0 2px 2px;
+  }
+
+  @keyframes rainFall {
+    0% { transform: translateY(-100%); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(320px); opacity: 0; }
+  }
+
+  .rain-text {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: rgba(220,200,180,0.9);
+    font-size: 1.1rem;
+    font-style: italic;
+    text-shadow: 0 0 20px rgba(200,180,150,0.3);
+    animation: rainTextPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes rainTextPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .rain-controls {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    background: #4a3a3a;
+  }
+
+  .rain-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: #ccc;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    transition: all 0.3s;
+  }
+
+  .rain-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+  /* ===== 留声机 ===== */
+  .phono-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(8px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .phono-machine {
+    width: 90%;
+    max-width: 460px;
+    background: linear-gradient(180deg, #5a3a2a 0%, #3a2010 100%);
+    border-radius: 24px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+    border: 3px solid #6a4a3a;
+    position: relative;
+  }
+
+  .phono-turntable {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1a1a1a 30%, #0a0a0a 70%);
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .phono-disc {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #111 0%, #222 50%, #111 100%);
+    position: relative;
+    transition: animation 0.3s ease;
+  }
+
+  .phono-disc.spinning {
+    animation: discSpin 2s linear infinite;
+  }
+
+  @keyframes discSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .phono-disc-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c4956a, #d4b896);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    z-index: 2;
+  }
+
+  .phono-disc-groove {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.04);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .phono-disc-groove:nth-child(2) { width: 90px; height: 90px; }
+  .phono-disc-groove:nth-child(3) { width: 70px; height: 70px; }
+
+  .phono-horn {
+    width: 80px;
+    height: 60px;
+    margin: 0 auto 0.5rem;
+    position: relative;
+  }
+
+  .phono-horn-inner {
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 50px solid #c4956a;
+    margin: 0 auto;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
     transition: all 0.3s ease;
-    user-select: none;
   }
-  .puzzle-piece:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-  .puzzle-piece.matched { background: #c4a882; opacity: 0.5; cursor: default; pointer-events: none; }
-  .puzzle-piece.selected { transform: scale(1.1); box-shadow: 0 0 0 3px var(--past-accent); }
-  .puzzle-complete {
+
+  .phono-horn-inner.playing {
+    animation: hornVibrate 0.3s ease-in-out infinite;
+  }
+
+  @keyframes hornVibrate {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+
+  .phono-crank {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8a6a4a, #6a4a2a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 0.5rem auto;
     font-size: 1.2rem;
-    color: var(--past-accent);
-    font-weight: 600;
-    animation: modalPop 0.5s ease;
-    grid-column: 1 / -1;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
   }
-  .puzzle-close {
+
+  .phono-crank:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+
+  .phono-crank:active {
+    transform: rotate(180deg) scale(0.95);
+  }
+
+  .phono-now-playing {
+    padding: 0.5rem;
+    color: #d4b896;
+    font-size: 0.85rem;
+    font-style: italic;
+    min-height: 1.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .phono-close {
+    width: 100%;
+    padding: 0.6rem;
     margin-top: 0.8rem;
-    padding: 0.5rem 1.5rem;
-    border: 1px solid var(--past-border);
-    border-radius: 999px;
-    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    background: rgba(0,0,0,0.3);
+    color: #999;
     cursor: pointer;
     font-family: inherit;
     font-size: 0.85rem;
-    color: var(--past-text);
     transition: all 0.3s;
   }
-  .puzzle-close:hover { background: rgba(255,255,255,0.7); }
+
+  .phono-close:hover { background: rgba(0,0,0,0.5); color: #ddd; }
 
   /* ===== 旧电视 ===== */
   .tv-overlay {
@@ -543,53 +755,6 @@ const pastQuotes = [
     transition: background 0.3s;
   }
   .tv-close:hover { background: #444; color: #ddd; }
-
-  /* ===== 煤油灯 ===== */
-  .lamp-cursor-area {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9999;
-    display: none;
-  }
-  .lamp-glow {
-    position: absolute;
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,200,120,0.5) 0%, rgba(255,180,80,0.2) 40%, transparent 70%);
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    mix-blend-mode: screen;
-  }
-
-  /* ===== 沙画 ===== */
-  .sand-canvas {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9998;
-    display: none;
-  }
-  .sand-canvas.active {
-    display: block;
-    pointer-events: auto;
-  }
-  .sand-hint {
-    position: fixed;
-    top: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
-    background: rgba(0,0,0,0.6);
-    color: #e8d5a3;
-    padding: 0.4rem 1rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    pointer-events: none;
-    display: none;
-  }
-  .sand-hint.active { display: block; }
 
   /* ===== 头部 ===== */
   .past-hero {
@@ -795,65 +960,64 @@ const pastQuotes = [
   @media (max-width: 768px) {
     .past-hero-title { font-size: 2.2rem; }
     .past-masonry { grid-template-columns: 1fr; }
-    .capsule-trigger,
-    .puzzle-trigger,
-    .lamp-toggle,
-    .sand-toggle { width: 44px; height: 44px; font-size: 0.9rem; }
-    .capsule-trigger { bottom: 1.5rem; right: 1rem; }
-    .puzzle-trigger { bottom: 1.5rem; right: 4.5rem; }
-    .lamp-toggle { bottom: 1.5rem; right: 8rem; }
-    .sand-toggle { bottom: 1.5rem; right: 11.5rem; }
+    .floating-buttons { bottom: 1rem; right: 1rem; gap: 0.4rem; }
+    .float-btn { width: 44px; height: 44px; border-radius: 14px; }
+    .float-btn-icon { font-size: 1rem; }
+    .float-btn-label { font-size: 0.48rem; }
+    .phono-turntable { width: 110px; height: 110px; }
+    .phono-disc { width: 85px; height: 85px; }
   }
 </style>
 
 <script>
   // ===== 银杏叶飘落 =====
-  const canvas = document.getElementById("leafCanvas") as HTMLCanvasElement | null;
-  if (canvas) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas error");
-    let w = (canvas.width = innerWidth);
-    let h = (canvas.height = innerHeight);
-    addEventListener("resize", () => { w = canvas.width = innerWidth; h = canvas.height = innerHeight; });
+  const leafCanvas = document.getElementById("leafCanvas") as HTMLCanvasElement | null;
+  if (leafCanvas) {
+    const ctx = leafCanvas.getContext("2d");
+    if (ctx) {
+      let w = (leafCanvas.width = innerWidth);
+      let h = (leafCanvas.height = innerHeight);
+      addEventListener("resize", () => { w = leafCanvas.width = innerWidth; h = leafCanvas.height = innerHeight; });
 
-    const leaves: { x: number; y: number; s: number; vx: number; vy: number; r: number; rs: number; o: number }[] = [];
-    for (let i = 0; i < 25; i++) {
-      leaves.push({
-        x: Math.random() * w, y: Math.random() * h - h,
-        s: Math.random() * 10 + 6, vx: Math.random() * 0.8 - 0.2, vy: Math.random() * 0.6 + 0.4,
-        r: Math.random() * 360, rs: Math.random() * 1.2 - 0.5,
-        o: Math.random() * 0.35 + 0.2,
-      });
-    }
-
-    function drawLeaf(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, r: number, o: number) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate((r * Math.PI) / 180); ctx.globalAlpha = o;
-      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
-      g.addColorStop(0, "#e8d5a3"); g.addColorStop(0.6, "#d4b870"); g.addColorStop(1, "transparent");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.3, s * 0.6, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function anim() {
-      ctx!.clearRect(0, 0, w, h);
-      for (const l of leaves) {
-        l.x += l.vx; l.y += l.vy; l.r += l.rs;
-        if (l.y > h + 30) { l.y = -30; l.x = Math.random() * w; }
-        if (l.x > w + 30) l.x = -30;
-        if (l.x < -30) l.x = w + 30;
-        drawLeaf(ctx!, l.x, l.y, l.s, l.r, l.o);
+      const leaves: { x: number; y: number; s: number; vx: number; vy: number; r: number; rs: number; o: number }[] = [];
+      for (let i = 0; i < 25; i++) {
+        leaves.push({
+          x: Math.random() * w, y: Math.random() * h - h,
+          s: Math.random() * 10 + 6, vx: Math.random() * 0.8 - 0.2, vy: Math.random() * 0.6 + 0.4,
+          r: Math.random() * 360, rs: Math.random() * 1.2 - 0.5,
+          o: Math.random() * 0.35 + 0.2,
+        });
       }
-      requestAnimationFrame(anim);
+
+      function drawLeaf(ctx2: CanvasRenderingContext2D, x: number, y: number, s: number, r: number, o: number) {
+        ctx2.save(); ctx2.translate(x, y); ctx2.rotate((r * Math.PI) / 180); ctx2.globalAlpha = o;
+        const g = ctx2.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
+        g.addColorStop(0, "#e8d5a3"); g.addColorStop(0.6, "#d4b870"); g.addColorStop(1, "transparent");
+        ctx2.fillStyle = g;
+        ctx2.beginPath();
+        ctx2.ellipse(0, 0, s * 0.3, s * 0.6, 0, 0, Math.PI * 2);
+        ctx2.fill();
+        ctx2.restore();
+      }
+
+      function anim() {
+        ctx!.clearRect(0, 0, w, h);
+        for (const l of leaves) {
+          l.x += l.vx; l.y += l.vy; l.r += l.rs;
+          if (l.y > h + 30) { l.y = -30; l.x = Math.random() * w; }
+          if (l.x > w + 30) l.x = -30;
+          if (l.x < -30) l.x = w + 30;
+          drawLeaf(ctx!, l.x, l.y, l.s, l.r, l.o);
+        }
+        requestAnimationFrame(anim);
+      }
+      anim();
     }
-    anim();
   }
 
   // ===== 点击银杏叶散开 =====
   document.getElementById("pastPage")?.addEventListener("click", (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest(".puzzle-piece")) return;
+    if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest(".float-btn")) return;
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI * 2 * i) / 6;
       const d = 50 + Math.random() * 30;
@@ -890,10 +1054,6 @@ const pastQuotes = [
 
   // ===== 时间胶囊 =====
   const capsuleTrigger = document.getElementById("capsuleTrigger");
-  const capsuleOverlay = document.getElementById("capsuleOverlay");
-  const capsuleContent = document.getElementById("capsuleContent");
-  const capsuleClose = document.getElementById("capsuleClose");
-
   let capsuleData: { title: string; date: string; excerpt: string }[] = [];
   try {
     const el = document.getElementById("pastPostsData");
@@ -901,21 +1061,21 @@ const pastQuotes = [
   } catch {}
 
   capsuleTrigger?.addEventListener("click", () => {
-    if (!capsuleOverlay || !capsuleContent) return;
-    if (capsuleData.length > 0) {
-      const item = capsuleData[Math.floor(Math.random() * capsuleData.length)];
-      capsuleContent.innerHTML = `
-        <span class="capsule-item-title">${item.title}</span>
-        <span class="capsule-item-date">${item.date}</span>
-        <p>"${item.excerpt}"</p>
-      `;
-    } else {
-      capsuleContent.innerHTML = `<p>"还没有从前的记录，去后台发一篇吧~"</p>`;
-    }
-    capsuleOverlay.style.display = "flex";
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.2);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:rgba(252,248,240,0.95);border-radius:20px;padding:1.5rem;max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.15)";
+    const item = capsuleData.length > 0 ? capsuleData[Math.floor(Math.random() * capsuleData.length)] : null;
+    modal.innerHTML = `
+      <div style="font-size:2rem;margin-bottom:0.5rem">⏳</div>
+      ${item ? `<div style="font-weight:600;color:#3a2a1a;margin-bottom:0.3rem">${item.title}</div><div style="font-size:0.78rem;color:#8a7a6a;margin-bottom:0.5rem">${item.date}</div><p style="font-style:italic;color:#8a7a6a;line-height:1.6">"${item.excerpt}"</p>` : '<p style="color:#8a7a6a;font-style:italic">还没有从前的记录</p>'}
+      <button style="margin-top:1rem;padding:0.5rem 1.5rem;border:1px solid rgba(180,150,120,0.3);border-radius:999px;background:rgba(255,255,255,0.4);cursor:pointer;font-family:inherit;color:#3a2a1a">合上胶囊</button>
+    `;
+    modal.querySelector("button")?.addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   });
-  capsuleClose?.addEventListener("click", () => { if (capsuleOverlay) capsuleOverlay.style.display = "none"; });
-  capsuleOverlay?.addEventListener("click", (e) => { if (e.target === capsuleOverlay) capsuleOverlay.style.display = "none"; });
 
   // ===== JY/JX 计数 =====
   try {
@@ -932,84 +1092,132 @@ const pastQuotes = [
   } catch {}
 
   // ==========================================
-  // 🧩 记忆碎片拼图
+  // 🪟 雨声窗台
   // ==========================================
-  const puzzleTrigger = document.getElementById("puzzleTrigger");
-  const puzzleEmojis = ["📷","🎞️","📼","🕰️","📜","🍂","☕","🚂","🏠"];
-  let puzzleOpen = false;
+  const rainWindowToggle = document.getElementById("rainWindowToggle");
+  const rainOverlay = document.getElementById("rainOverlay");
+  const rainDrops = document.getElementById("rainDrops");
+  const rainToggle = document.getElementById("rainToggle");
+  const rainClose = document.getElementById("rainClose");
+  let rainActive = true;
+  let rainInterval: ReturnType<typeof setInterval> | null = null;
 
-  puzzleTrigger?.addEventListener("click", () => {
-    if (puzzleOpen) return;
-    puzzleOpen = true;
+  function createRainDrop() {
+    if (!rainDrops || !rainActive) return;
+    const drop = document.createElement("div");
+    drop.className = "rain-drop";
+    drop.style.left = Math.random() * 100 + "%";
+    drop.style.height = Math.random() * 20 + 15 + "px";
+    drop.style.animationDuration = Math.random() * 0.6 + 0.6 + "s";
+    drop.style.animationDelay = Math.random() * 0.3 + "s";
+    rainDrops.appendChild(drop);
+    setTimeout(() => drop.remove(), 1500);
+  }
 
-    const overlay = document.createElement("div");
-    overlay.className = "puzzle-overlay";
+  function startRain() {
+    if (rainInterval) clearInterval(rainInterval);
+    rainInterval = setInterval(createRainDrop, 60);
+    for (let i = 0; i < 40; i++) setTimeout(createRainDrop, i * 25);
+  }
 
-    const board = document.createElement("div");
-    board.className = "puzzle-board";
+  function stopRain() {
+    if (rainInterval) clearInterval(rainInterval);
+    if (rainDrops) rainDrops.innerHTML = "";
+  }
 
-    const title = document.createElement("h3");
-    title.textContent = "🧩 记忆碎片拼图";
-    title.style.margin = "0 0 0.5rem";
-    title.style.color = "var(--past-text)";
-    title.style.fontWeight = "400";
-    board.appendChild(title);
+  rainWindowToggle?.addEventListener("click", () => {
+    if (rainOverlay) rainOverlay.style.display = "flex";
+    rainActive = true;
+    if (rainToggle) rainToggle.textContent = "⏯️ 暂停雨";
+    startRain();
+  });
 
-    const grid = document.createElement("div");
-    grid.className = "puzzle-grid";
+  rainToggle?.addEventListener("click", () => {
+    rainActive = !rainActive;
+    if (rainActive) {
+      rainToggle.textContent = "⏯️ 暂停雨";
+      startRain();
+    } else {
+      rainToggle.textContent = "▶️ 继续下雨";
+      stopRain();
+    }
+  });
 
-    const shuffled = [...puzzleEmojis].sort(() => Math.random() - 0.5).slice(0, 6);
-    const pairs = [...shuffled, ...shuffled].sort(() => Math.random() - 0.5);
-    let selected: HTMLDivElement | null = null;
-    let matched = 0;
+  rainClose?.addEventListener("click", () => {
+    if (rainOverlay) rainOverlay.style.display = "none";
+    stopRain();
+  });
 
-    pairs.forEach((emoji) => {
-      const piece = document.createElement("div");
-      piece.className = "puzzle-piece";
-      piece.textContent = emoji;
-      piece.dataset.emoji = emoji;
-
-      piece.addEventListener("click", () => {
-        if (piece.classList.contains("matched") || piece === selected) return;
-
-        if (selected && selected.dataset.emoji === emoji) {
-          piece.classList.add("matched");
-          selected.classList.add("matched");
-          selected.classList.remove("selected");
-          piece.classList.remove("selected");
-          selected = null;
-          matched += 2;
-          if (matched === 12) {
-            const complete = document.createElement("div");
-            complete.className = "puzzle-complete";
-            complete.textContent = "✨ 拼图完成！那些从前的碎片，拼成了现在的你 ✨";
-            grid.appendChild(complete);
-          }
-        } else {
-          if (selected) selected.classList.remove("selected");
-          piece.classList.add("selected");
-          selected = piece;
-        }
-      });
-
-      grid.appendChild(piece);
-    });
-
-    board.appendChild(grid);
-
-    const close = document.createElement("button");
-    close.className = "puzzle-close";
-    close.textContent = "收起拼图";
-    close.addEventListener("click", () => { overlay.remove(); puzzleOpen = false; });
-
-    board.appendChild(close);
-    overlay.appendChild(board);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.remove(); puzzleOpen = false; } });
-    document.body.appendChild(overlay);
+  rainOverlay?.addEventListener("click", (e) => {
+    if (e.target === rainOverlay) {
+      rainOverlay.style.display = "none";
+      stopRain();
+    }
   });
 
   // ==========================================
-  // 📺 旧电视雪花
+  // 📯 旧式留声机
+  // ==========================================
+  const phonoToggle = document.getElementById("phonographToggle");
+  const phonoOverlay = document.getElementById("phonoOverlay");
+  const phonoTurntable = document.getElementById("phonoTurntable");
+  const phonoDisc = document.querySelector(".phono-disc") as HTMLElement | null;
+  const phonoHornInner = document.querySelector(".phono-horn-inner") as HTMLElement | null;
+  const phonoCrank = document.getElementById("phonoCrank");
+  const phonoNowPlaying = document.getElementById("phonoNowPlaying");
+  const phonoClose = document.getElementById("phonoClose");
+  let isPhonoPlaying = false;
+
+  const phonoMemories = [
+    "那些独自走过的路，后来都成了故事...",
+    "在遇见你之前，我练习了很久的独处",
+    "每一段从前，都在为相遇做准备",
+    "没有你的日子，都是序章",
+    "各自发光，然后彼此照亮",
+  ];
+  let phonoIndex = 0;
+
+  phonoToggle?.addEventListener("click", () => {
+    if (phonoOverlay) phonoOverlay.style.display = "flex";
+  });
+
+  phonoCrank?.addEventListener("click", () => {
+    if (isPhonoPlaying) return;
+    isPhonoPlaying = true;
+    phonoDisc?.classList.add("spinning");
+    phonoHornInner?.classList.add("playing");
+
+    const memory = phonoMemories[phonoIndex % phonoMemories.length];
+    phonoIndex++;
+    if (phonoNowPlaying) {
+      phonoNowPlaying.innerHTML = `<span>🎶 正在播放：</span><br><span style="font-style:italic">"${memory}"</span>`;
+    }
+
+    setTimeout(() => {
+      isPhonoPlaying = false;
+      phonoDisc?.classList.remove("spinning");
+      phonoHornInner?.classList.remove("playing");
+    }, 4000);
+  });
+
+  phonoClose?.addEventListener("click", () => {
+    if (phonoOverlay) phonoOverlay.style.display = "none";
+    isPhonoPlaying = false;
+    phonoDisc?.classList.remove("spinning");
+    phonoHornInner?.classList.remove("playing");
+  });
+
+  phonoOverlay?.addEventListener("click", (e) => {
+    if (e.target === phonoOverlay) {
+      phonoOverlay.style.display = "none";
+      isPhonoPlaying = false;
+      phonoDisc?.classList.remove("spinning");
+      phonoHornInner?.classList.remove("playing");
+    }
+  });
+
+  // ==========================================
+  // 📺 旧电视（双击卡片触发）
   // ==========================================
   document.querySelectorAll(".past-card").forEach((card) => {
     card.addEventListener("dblclick", (e) => {
@@ -1026,7 +1234,6 @@ const pastQuotes = [
 
       const staticDiv = document.createElement("div");
       staticDiv.className = "tv-static";
-      staticDiv.id = "tvStaticArea";
 
       const reveal = document.createElement("div");
       reveal.className = "tv-reveal";
@@ -1068,43 +1275,9 @@ const pastQuotes = [
       screen.appendChild(closeBtn);
 
       overlay.appendChild(screen);
-      overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
       document.body.appendChild(overlay);
     });
-  });
-
-  // ==========================================
-  // 🪔 煤油灯
-  // ==========================================
-  const lampToggle = document.getElementById("lampToggle");
-  const lampArea = document.getElementById("lampArea");
-  const lampGlow = document.getElementById("lampGlow");
-  let lampOn = false;
-
-  lampToggle?.addEventListener("click", () => {
-    lampOn = !lampOn;
-    if (lampOn) {
-      lampToggle.classList.add("active");
-      if (lampArea) lampArea.style.display = "block";
-      document.body.style.cursor = "none";
-    } else {
-      lampToggle.classList.remove("active");
-      if (lampArea) lampArea.style.display = "none";
-      document.body.style.cursor = "";
-    }
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!lampOn || !lampGlow) return;
-    lampGlow.style.left = e.clientX + "px";
-    lampGlow.style.top = e.clientY + "px";
-  });
-
-  lampArea?.addEventListener("click", () => {
-    lampOn = false;
-    lampToggle?.classList.remove("active");
-    if (lampArea) lampArea.style.display = "none";
-    document.body.style.cursor = "";
   });
 
   // ==========================================
@@ -1121,7 +1294,7 @@ const pastQuotes = [
   sandToggle?.addEventListener("click", () => {
     sandOn = !sandOn;
     if (sandOn) {
-      sandToggle.classList.add("active");
+      sandToggle.style.background = "rgba(200,170,120,0.3)";
       sandCanvas?.classList.add("active");
       if (sandHint) sandHint.classList.add("active");
       if (sandCanvas) {
@@ -1129,13 +1302,13 @@ const pastQuotes = [
         sandCanvas.height = innerHeight;
         sandCtx = sandCanvas.getContext("2d");
         if (sandCtx) {
-          sandCtx.fillStyle = "rgba(200, 170, 120, 0.15)";
+          sandCtx.fillStyle = "rgba(200, 170, 120, 0.12)";
           sandCtx.fillRect(0, 0, sandCanvas.width, sandCanvas.height);
         }
       }
       document.body.style.cursor = "crosshair";
     } else {
-      sandToggle.classList.remove("active");
+      sandToggle.style.background = "";
       sandCanvas?.classList.remove("active");
       if (sandHint) sandHint.classList.remove("active");
       document.body.style.cursor = "";
@@ -1160,7 +1333,6 @@ const pastQuotes = [
     sandCtx.moveTo(sandPoints[sandPoints.length - 2]?.x || e.clientX, sandPoints[sandPoints.length - 2]?.y || e.clientY);
     sandCtx.lineTo(e.clientX, e.clientY);
     sandCtx.stroke();
-
     if (sandPoints.length > 60) {
       sandCtx.fillStyle = "rgba(200, 170, 120, 0.02)";
       sandCtx.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
