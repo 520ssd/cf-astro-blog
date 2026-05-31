@@ -1,3 +1,936 @@
+---
+export const prerender = false;
+
+import { env } from "cloudflare:workers";
+import { desc, sql } from "drizzle-orm";
+import { blogPosts } from "@/db/schema";
+import Base from "@/layouts/Base.astro";
+import { getDb } from "@/lib/db";
+import { getPublicPostVisibilityCondition } from "@/lib/public-content";
+
+const articleSlug = Astro.url.searchParams.get("article");
+const page = Number(Astro.url.searchParams.get("page") || "1");
+const limit = 12;
+const offset = (page - 1) * limit;
+
+interface PastPostRow {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  publishedAt: string | null;
+  featuredImageKey: string | null;
+  content: string;
+}
+
+let posts: PastPostRow[] = [];
+let totalPosts = 0;
+let detailPost: PastPostRow | null = null;
+
+try {
+  const db = getDb(env.DB);
+
+  if (articleSlug) {
+    const [result] = await db
+      .select({
+        title: blogPosts.title,
+        slug: blogPosts.slug,
+        excerpt: blogPosts.excerpt,
+        publishedAt: blogPosts.publishedAt,
+        featuredImageKey: blogPosts.featuredImageKey,
+        content: blogPosts.content,
+      })
+      .from(blogPosts)
+      .where(sql`${getPublicPostVisibilityCondition()} AND ${blogPosts.slug} = ${articleSlug}`)
+      .limit(1);
+    detailPost = result || null;
+  }
+
+  const [countRes] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(blogPosts)
+    .where(sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'past' OR ${blogPosts.slug} LIKE 'past/%' OR ${blogPosts.slug} LIKE 'past-%')`);
+  totalPosts = countRes?.count ?? 0;
+
+  posts = await db
+    .select({
+      title: blogPosts.title,
+      slug: blogPosts.slug,
+      excerpt: blogPosts.excerpt,
+      publishedAt: blogPosts.publishedAt,
+      featuredImageKey: blogPosts.featuredImageKey,
+      content: blogPosts.content,
+    })
+    .from(blogPosts)
+    .where(sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'past' OR ${blogPosts.slug} LIKE 'past/%' OR ${blogPosts.slug} LIKE 'past-%')`)
+    .orderBy(desc(blogPosts.publishedAt))
+    .limit(limit)
+    .offset(offset);
+} catch (e) {
+  console.error("Past page fetch error:", e);
+}
+
+const totalPages = Math.ceil(totalPosts / limit);
+
+function getPreviewContent(content: string, maxLen = 100): string {
+  const text = content.replace(/[#*`\[\]!>\-]/g, "").replace(/\s+/g, " ").trim();
+  return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
+
+const pastQuotes = [
+  "我们各自走了很远的路，才来到彼此面前",
+  "没有相遇之前，我们都在成为更好的自己",
+  "你走过的路，我走过的路，加起来就是我们的故事",
+  "各自发光，然后彼此照亮",
+  "从前的我，也在努力走向你",
+  "每一段独自走过的时光，都不是浪费",
+];
+---
+
+<Base title="从前" description="认识你之前，我们各自的故事 📷">
+  <div class="past-page" id="pastPage">
+    <canvas id="leafCanvas" class="leaf-canvas"></canvas>
+
+    {/* ===== 时间胶囊 ===== */}
+    <div class="capsule-trigger" id="capsuleTrigger" title="打开时间胶囊">
+      <span class="capsule-trigger-icon">📷</span>
+    </div>
+
+    {/* ===== 记忆碎片拼图按钮 ===== */}
+    <div class="puzzle-trigger" id="puzzleTrigger" title="记忆碎片拼图">
+      <span class="puzzle-trigger-icon">🧩</span>
+    </div>
+
+    {/* ===== 煤油灯按钮 ===== */}
+    <div class="lamp-toggle" id="lampToggle" title="煤油灯">
+      <span>🪔</span>
+    </div>
+
+    {/* ===== 沙画按钮 ===== */}
+    <div class="sand-toggle" id="sandToggle" title="沙画">
+      <span>🏜️</span>
+    </div>
+
+    {/* ===== 煤油灯光圈 ===== */}
+    <div class="lamp-cursor-area" id="lampArea">
+      <div class="lamp-glow" id="lampGlow"></div>
+    </div>
+
+    {/* ===== 沙画画布 ===== */}
+    <canvas class="sand-canvas" id="sandCanvas"></canvas>
+    <div class="sand-hint" id="sandHint">🖐️ 按住鼠标拖拽画沙，松手后慢慢消散</div>
+
+    {detailPost ? (
+      <article class="past-detail">
+        <div class="past-detail-card">
+          <header class="past-detail-hero">
+            <span class="past-detail-icon">📷</span>
+            <h1 class="past-detail-title">{detailPost.title}</h1>
+            {detailPost.publishedAt && <span class="past-detail-date">{formatDate(detailPost.publishedAt)}</span>}
+          </header>
+          {detailPost.featuredImageKey && (
+            <div class="past-detail-image-wrap">
+              <img src={`/media/${detailPost.featuredImageKey}`} alt={detailPost.title} class="past-detail-image" />
+            </div>
+          )}
+          <div class="past-detail-body">
+            <div class="past-detail-content" set:html={detailPost.content}></div>
+          </div>
+          <footer class="past-detail-footer">
+            <a href="/past" class="past-detail-back">← 回到从前</a>
+          </footer>
+        </div>
+      </article>
+    ) : (
+      <>
+        <header class="past-hero">
+          <div class="past-hero-content">
+            <div class="past-hero-icon-row">
+              <span class="past-floating-icon">📷</span>
+              <span class="past-floating-icon" style="animation-delay:0.6s">🎞️</span>
+              <span class="past-floating-icon" style="animation-delay:1.2s">📼</span>
+            </div>
+            <h1 class="past-hero-title">从前</h1>
+            <p class="past-hero-subtitle">认识你之前，我们各自的故事</p>
+            <div class="past-hero-quote" id="pastQuote">"{pastQuotes[0]}"</div>
+            <div class="past-hero-stats">
+              <div class="past-stat">
+                <span class="past-stat-label">JY</span>
+                <span class="past-stat-num" id="jyCount">0</span>
+              </div>
+              <div class="past-stat-divider"></div>
+              <div class="past-stat">
+                <span class="past-stat-label">JX</span>
+                <span class="past-stat-num" id="jxCount">0</span>
+              </div>
+            </div>
+          </div>
+          <div class="past-hero-scroll">
+            <span>翻阅从前</span>
+            <span class="past-scroll-arrow">↓</span>
+          </div>
+        </header>
+
+        <main class="past-main">
+          {posts.length > 0 ? (
+            <div class="past-masonry">
+              {posts.map((post, i) => {
+                const previewContent = getPreviewContent(post.content);
+                const dateStr = formatDate(post.publishedAt);
+
+                return (
+                  <a href={`/past?article=${post.slug}`} class="past-card-link">
+                    <article class="past-card" style={`animation-delay:${i * 0.1}s`}>
+                      {post.featuredImageKey ? (
+                        <div class="past-card-image-wrap">
+                          <img src={`/media/${post.featuredImageKey}`} alt={post.title} class="past-card-image" loading="lazy" />
+                        </div>
+                      ) : (
+                        <div class="past-card-image-wrap past-card-placeholder">
+                          <span class="past-card-placeholder-icon">📷</span>
+                        </div>
+                      )}
+                      <div class="past-card-body">
+                        <div class="past-card-meta">
+                          <span class="past-card-date">{dateStr}</span>
+                          {post.excerpt && <span class="past-card-tag">{post.excerpt}</span>}
+                        </div>
+                        <h3 class="past-card-title">{post.title}</h3>
+                        <p class="past-card-excerpt">{previewContent}</p>
+                      </div>
+                    </article>
+                  </a>
+                );
+              })}
+            </div>
+          ) : (
+            <div class="past-empty">
+              <span class="past-empty-icon">📷</span>
+              <h3>还没有记录</h3>
+              <p>那些各自成长的时光</p>
+              <p>在这里安放</p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div class="past-pagination">
+              {page > 1 && <a href={`/past?page=${page - 1}`} class="past-page-btn">← 上一页</a>}
+              <span class="past-page-info">{page} / {totalPages}</span>
+              {page < totalPages && <a href={`/past?page=${page + 1}`} class="past-page-btn">下一页 →</a>}
+            </div>
+          )}
+        </main>
+
+        <footer class="past-footer">
+          <p class="past-footer-text">各自走了很远的路，才来到彼此面前</p>
+        </footer>
+      </>
+    )}
+  </div>
+
+  {/* ===== 时间胶囊弹窗 ===== */}
+  <div class="capsule-overlay" id="capsuleOverlay" style="display:none">
+    <div class="capsule-modal">
+      <div class="capsule-lid"><span>📷</span></div>
+      <div class="capsule-body">
+        <div class="capsule-content" id="capsuleContent"></div>
+      </div>
+      <button class="capsule-close" id="capsuleClose">合上胶囊</button>
+    </div>
+  </div>
+</Base>
+
+<script type="application/json" id="pastPostsData">
+  {JSON.stringify(posts.map(p => ({
+    title: p.title,
+    date: p.publishedAt ? formatDate(p.publishedAt) : "",
+    excerpt: p.excerpt || getPreviewContent(p.content, 60),
+    author: p.excerpt || ""
+  })))}
+</script>
+
+<style is:global>
+  :root {
+    --past-warm: #d4b896;
+    --past-paper: rgba(252, 248, 240, 0.85);
+    --past-glass: rgba(252, 248, 240, 0.55);
+    --past-border: rgba(180, 150, 120, 0.3);
+    --past-text: #3a2a1a;
+    --past-text-light: #8a7a6a;
+    --past-accent: #c4956a;
+    --past-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  .past-page {
+    min-height: 100vh;
+    position: relative;
+    color: var(--past-text);
+    font-family: "Georgia", "Noto Serif SC", "KaiTi", serif;
+    overflow-x: hidden;
+    background: transparent;
+  }
+
+  .leaf-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== 浮动按钮们 ===== */
+  .capsule-trigger,
+  .puzzle-trigger,
+  .lamp-toggle,
+  .sand-toggle {
+    position: fixed;
+    z-index: 100;
+    width: 56px;
+    height: 56px;
+    background: var(--past-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--past-border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--past-shadow);
+    transition: all 0.4s ease;
+    animation: capsuleFloat 3s ease-in-out infinite;
+  }
+  .capsule-trigger { bottom: 2rem; right: 2rem; }
+  .puzzle-trigger { bottom: 2rem; right: 6rem; animation-delay: 0.5s; }
+  .lamp-toggle { bottom: 2rem; right: 10rem; animation-delay: 1s; }
+  .sand-toggle { bottom: 2rem; right: 14rem; animation-delay: 1.5s; }
+  .capsule-trigger:hover,
+  .puzzle-trigger:hover,
+  .lamp-toggle:hover,
+  .sand-toggle:hover { transform: scale(1.15); }
+  .capsule-trigger-icon,
+  .puzzle-trigger-icon { font-size: 1.5rem; }
+  .lamp-toggle.active { background: rgba(255,200,120,0.3); border-color: rgba(255,180,80,0.5); }
+  .sand-toggle.active { background: rgba(200,170,120,0.3); }
+
+  @keyframes capsuleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  /* ===== 时间胶囊弹窗 ===== */
+  .capsule-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.2);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .capsule-modal {
+    background: rgba(252, 248, 240, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    animation: modalPop 0.4s ease;
+  }
+  @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .capsule-lid {
+    background: linear-gradient(135deg, #d4b896, #c4a070);
+    padding: 1rem;
+    text-align: center;
+    font-size: 2rem;
+  }
+  .capsule-body {
+    padding: 1.5rem;
+    text-align: center;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .capsule-content {
+    font-style: italic;
+    color: var(--past-text-light);
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .capsule-content .capsule-item-title { font-weight: 600; color: var(--past-text); font-style: normal; }
+  .capsule-content .capsule-item-date { font-size: 0.78rem; }
+  .capsule-close {
+    width: 100%;
+    padding: 0.7rem;
+    border: none;
+    background: rgba(180,150,120,0.15);
+    color: var(--past-text-light);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: background 0.3s;
+  }
+  .capsule-close:hover { background: rgba(180,150,120,0.25); }
+
+  /* ===== 拼图 ===== */
+  .puzzle-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(6px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  .puzzle-board {
+    background: rgba(252,248,240,0.95);
+    border-radius: 20px;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    text-align: center;
+  }
+  .puzzle-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin: 1rem 0;
+  }
+  .puzzle-piece {
+    aspect-ratio: 1;
+    background: linear-gradient(135deg, #d4b896, #c4a070);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    transition: all 0.3s ease;
+    user-select: none;
+  }
+  .puzzle-piece:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+  .puzzle-piece.matched { background: #c4a882; opacity: 0.5; cursor: default; pointer-events: none; }
+  .puzzle-piece.selected { transform: scale(1.1); box-shadow: 0 0 0 3px var(--past-accent); }
+  .puzzle-complete {
+    font-size: 1.2rem;
+    color: var(--past-accent);
+    font-weight: 600;
+    animation: modalPop 0.5s ease;
+    grid-column: 1 / -1;
+  }
+  .puzzle-close {
+    margin-top: 0.8rem;
+    padding: 0.5rem 1.5rem;
+    border: 1px solid var(--past-border);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.4);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--past-text);
+    transition: all 0.3s;
+  }
+  .puzzle-close:hover { background: rgba(255,255,255,0.7); }
+
+  /* ===== 旧电视 ===== */
+  .tv-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(8px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  .tv-screen {
+    width: 90%;
+    max-width: 440px;
+    background: #1a1a1a;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 80px rgba(0,0,0,0.3);
+  }
+  .tv-static {
+    width: 100%;
+    height: 220px;
+    background: repeating-linear-gradient(0deg, #000, #111 2px, #000 4px);
+    animation: tvStatic 0.1s infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  @keyframes tvStatic {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 10px; }
+  }
+  .tv-reveal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    color: #e8d5a3;
+    font-family: "Georgia", "KaiTi", serif;
+    padding: 1.5rem;
+    text-align: center;
+    animation: tvReveal 0.6s ease;
+  }
+  @keyframes tvReveal { from { opacity: 0; } to { opacity: 1; } }
+  .tv-reveal-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .tv-reveal-date { font-size: 0.78rem; opacity: 0.7; margin-bottom: 0.6rem; }
+  .tv-reveal-text { font-size: 0.9rem; font-style: italic; line-height: 1.5; }
+  .tv-knob-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    background: #222;
+  }
+  .tv-knob {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #555, #333);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: transform 0.3s;
+  }
+  .tv-knob:active { transform: rotate(90deg); }
+  .tv-power-light {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4a4;
+    box-shadow: 0 0 8px #4a4;
+  }
+  .tv-close {
+    width: 100%;
+    padding: 0.6rem;
+    border: none;
+    background: #333;
+    color: #999;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    transition: background 0.3s;
+  }
+  .tv-close:hover { background: #444; color: #ddd; }
+
+  /* ===== 煤油灯 ===== */
+  .lamp-cursor-area {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+  }
+  .lamp-glow {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,200,120,0.5) 0%, rgba(255,180,80,0.2) 40%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  /* ===== 沙画 ===== */
+  .sand-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    display: none;
+  }
+  .sand-canvas.active {
+    display: block;
+    pointer-events: auto;
+  }
+  .sand-hint {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background: rgba(0,0,0,0.6);
+    color: #e8d5a3;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    pointer-events: none;
+    display: none;
+  }
+  .sand-hint.active { display: block; }
+
+  /* ===== 头部 ===== */
+  .past-hero {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+  }
+  .past-hero-icon-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .past-floating-icon { font-size: 1.8rem; animation: pastFloat 4s ease-in-out infinite; }
+
+  @keyframes pastFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    30% { transform: translateY(-10px) rotate(3deg); }
+    60% { transform: translateY(-3px) rotate(-3deg); }
+  }
+
+  .past-hero-title {
+    font-size: 3rem;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    color: var(--past-text);
+    margin: 0 0 0.3rem;
+  }
+  .past-hero-subtitle {
+    font-size: 0.95rem;
+    color: var(--past-text-light);
+    letter-spacing: 0.06em;
+    margin: 0 0 1.5rem;
+  }
+  .past-hero-quote {
+    font-size: 0.95rem;
+    color: var(--past-accent);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+  }
+  .past-hero-quote:hover { transform: scale(1.04); }
+
+  .past-hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    justify-content: center;
+  }
+  .past-stat {
+    background: var(--past-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--past-border);
+    border-radius: 16px;
+    padding: 0.8rem 1.4rem;
+    text-align: center;
+  }
+  .past-stat-num { font-size: 1.8rem; font-weight: 500; display: block; }
+  .past-stat-label { font-size: 0.75rem; color: var(--past-text-light); letter-spacing: 0.06em; display: block; margin-bottom: 0.2rem; }
+  .past-stat-divider { width: 1px; height: 36px; background: var(--past-border); }
+
+  .past-hero-scroll {
+    position: absolute;
+    bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--past-text-light);
+    font-size: 0.78rem;
+    animation: pastScrollBounce 2s ease-in-out infinite;
+  }
+  @keyframes pastScrollBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(5px); }
+  }
+
+  /* ===== 卡片 ===== */
+  .past-main { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto 4rem; padding: 0 1.5rem; }
+  .past-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+  .past-card-link { text-decoration: none; color: inherit; display: block; }
+  .past-card {
+    background: var(--past-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--past-border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    animation: cardFade 0.6s ease forwards;
+    opacity: 0;
+  }
+  @keyframes cardFade { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .past-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.05);
+    border-color: rgba(180,140,100,0.5);
+  }
+  .past-card-image-wrap {
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(200,180,160,0.2), rgba(220,200,180,0.1));
+    position: relative;
+  }
+  .past-card-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s; }
+  .past-card:hover .past-card-image { transform: scale(1.04); }
+  .past-card-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 140px;
+  }
+  .past-card-placeholder-icon { font-size: 2.5rem; opacity: 0.4; }
+  .past-card-body { padding: 0.9rem 1rem 1rem; }
+  .past-card-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
+  .past-card-date { font-size: 0.72rem; color: var(--past-text-light); }
+  .past-card-tag {
+    font-size: 0.68rem;
+    background: rgba(180,140,100,0.12);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    color: var(--past-accent);
+  }
+  .past-card-title { font-size: 1rem; font-weight: 500; margin: 0.3rem 0; line-height: 1.4; }
+  .past-card-excerpt { font-size: 0.8rem; color: var(--past-text-light); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* ===== 详情 ===== */
+  .past-detail { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 3rem 1.5rem; }
+  .past-detail-card {
+    background: var(--past-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--past-border);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: var(--past-shadow);
+  }
+  .past-detail-hero { text-align: center; margin-bottom: 1.5rem; }
+  .past-detail-icon { font-size: 2.2rem; display: block; margin-bottom: 0.5rem; }
+  .past-detail-title { font-size: 1.4rem; font-weight: 500; margin: 0 0 0.4rem; }
+  .past-detail-date { font-size: 0.8rem; color: var(--past-text-light); }
+  .past-detail-image-wrap { border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+  .past-detail-image { width: 100%; display: block; }
+  .past-detail-content { font-size: 0.95rem; line-height: 1.8; color: #5a4a3a; }
+  .past-detail-content :global(h2),.past-detail-content :global(h3){color:var(--past-text);font-weight:500;margin-top:1.2rem;margin-bottom:.5rem}
+  .past-detail-content :global(p){margin:0 0 0.8rem}
+  .past-detail-content :global(img){max-width:100%;border-radius:10px;margin:0.8rem 0}
+  .past-detail-footer { text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--past-border); }
+  .past-detail-back {
+    display: inline-flex;
+    padding: 0.5rem 1.2rem;
+    border: 1px solid var(--past-border);
+    border-radius: 999px;
+    color: var(--past-text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s;
+  }
+  .past-detail-back:hover { background: rgba(255,255,255,0.5); transform: translateX(-3px); }
+
+  /* ===== 空状态 ===== */
+  .past-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: var(--past-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--past-border);
+    border-radius: 20px;
+  }
+  .past-empty-icon { font-size: 2.5rem; display: block; margin-bottom: 0.8rem; }
+  .past-empty h3 { font-size: 1rem; font-weight: 400; margin: 0 0 0.3rem; color: var(--past-text); }
+  .past-empty p { font-size: 0.82rem; color: var(--past-text-light); margin: 0.2rem 0; }
+
+  /* ===== 分页 ===== */
+  .past-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding-top: 2rem; }
+  .past-page-btn {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--past-border);
+    border-radius: 999px;
+    color: var(--past-text);
+    text-decoration: none;
+    font-size: 0.8rem;
+    background: var(--past-glass);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s;
+  }
+  .past-page-btn:hover { background: rgba(255,255,255,0.5); }
+  .past-page-info { font-size: 0.8rem; color: var(--past-text-light); }
+
+  .past-footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 2.5rem 1rem;
+    font-size: 0.85rem;
+    color: var(--past-text-light);
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .past-hero-title { font-size: 2.2rem; }
+    .past-masonry { grid-template-columns: 1fr; }
+    .capsule-trigger,
+    .puzzle-trigger,
+    .lamp-toggle,
+    .sand-toggle { width: 44px; height: 44px; font-size: 0.9rem; }
+    .capsule-trigger { bottom: 1.5rem; right: 1rem; }
+    .puzzle-trigger { bottom: 1.5rem; right: 4.5rem; }
+    .lamp-toggle { bottom: 1.5rem; right: 8rem; }
+    .sand-toggle { bottom: 1.5rem; right: 11.5rem; }
+  }
+</style>
+
+<script>
+  // ===== 银杏叶飘落 =====
+  const canvas = document.getElementById("leafCanvas") as HTMLCanvasElement | null;
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas error");
+    let w = (canvas.width = innerWidth);
+    let h = (canvas.height = innerHeight);
+    addEventListener("resize", () => { w = canvas.width = innerWidth; h = canvas.height = innerHeight; });
+
+    const leaves: { x: number; y: number; s: number; vx: number; vy: number; r: number; rs: number; o: number }[] = [];
+    for (let i = 0; i < 25; i++) {
+      leaves.push({
+        x: Math.random() * w, y: Math.random() * h - h,
+        s: Math.random() * 10 + 6, vx: Math.random() * 0.8 - 0.2, vy: Math.random() * 0.6 + 0.4,
+        r: Math.random() * 360, rs: Math.random() * 1.2 - 0.5,
+        o: Math.random() * 0.35 + 0.2,
+      });
+    }
+
+    function drawLeaf(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, r: number, o: number) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate((r * Math.PI) / 180); ctx.globalAlpha = o;
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
+      g.addColorStop(0, "#e8d5a3"); g.addColorStop(0.6, "#d4b870"); g.addColorStop(1, "transparent");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.3, s * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function anim() {
+      ctx!.clearRect(0, 0, w, h);
+      for (const l of leaves) {
+        l.x += l.vx; l.y += l.vy; l.r += l.rs;
+        if (l.y > h + 30) { l.y = -30; l.x = Math.random() * w; }
+        if (l.x > w + 30) l.x = -30;
+        if (l.x < -30) l.x = w + 30;
+        drawLeaf(ctx!, l.x, l.y, l.s, l.r, l.o);
+      }
+      requestAnimationFrame(anim);
+    }
+    anim();
+  }
+
+  // ===== 点击银杏叶散开 =====
+  document.getElementById("pastPage")?.addEventListener("click", (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest(".puzzle-piece")) return;
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI * 2 * i) / 6;
+      const d = 50 + Math.random() * 30;
+      const el = document.createElement("div");
+      el.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;font-size:${Math.random()*10+10}px;pointer-events:none;z-index:999;transition:all .7s ease-out;opacity:.7`;
+      el.textContent = ["🍂","🍁","✨","📷"][Math.floor(Math.random() * 4)];
+      document.body.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = `translate(${Math.cos(angle)*d}px,${Math.sin(angle)*d}px) rotate(${Math.random()*120}deg)`;
+        el.style.opacity = "0";
+      });
+      setTimeout(() => el.remove(), 800);
+    }
+  });
+
+  // ===== 格言切换 =====
+  const pastQuote = document.getElementById("pastQuote");
+  const quotes = [
+    "我们各自走了很远的路，才来到彼此面前",
+    "没有相遇之前，我们都在成为更好的自己",
+    "你走过的路，我走过的路，加起来就是我们的故事",
+    "各自发光，然后彼此照亮",
+    "从前的我，也在努力走向你",
+    "每一段独自走过的时光，都不是浪费",
+  ];
+  let qi = 0;
+  pastQuote?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    qi = (qi + 1) % quotes.length;
+    pastQuote.innerHTML = `"${quotes[qi]}"`;
+    pastQuote.style.transform = "scale(1.06)";
+    setTimeout(() => { pastQuote.style.transform = "scale(1)"; }, 200);
+  });
+
+  // ===== 时间胶囊 =====
+  const capsuleTrigger = document.getElementById("capsuleTrigger");
+  const capsuleOverlay = document.getElementById("capsuleOverlay");
+  const capsuleContent = document.getElementById("capsuleContent");
+  const capsuleClose = document.getElementById("capsuleClose");
+
+  let capsuleData: { title: string; date: string; excerpt: string }[] = [];
+  try {
+    const el = document.getElementById("pastPostsData");
+    if (el && el.textContent) capsuleData = JSON.parse(el.textContent);
+  } catch {}
+
+  capsuleTrigger?.addEventListener("click", () => {
+    if (!capsuleOverlay || !capsuleContent) return;
+    if (capsuleData.length > 0) {
+      const item = capsuleData[Math.floor(Math.random() * capsuleData.length)];
+      capsuleContent.innerHTML = `
+        <span class="capsule-item-title">${item.title}</span>
+        <span class="capsule-item-date">${item.date}</span>
+        <p>"${item.excerpt}"</p>
+      `;
+    } else {
+      capsuleContent.innerHTML = `<p>"还没有从前的记录，去后台发一篇吧~"</p>`;
+    }
+    capsuleOverlay.style.display = "flex";
+  });
+  capsuleClose?.addEventListener("click", () => { if (capsuleOverlay) capsuleOverlay.style.display = "none"; });
+  capsuleOverlay?.addEventListener("click", (e) => { if (e.target === capsuleOverlay) capsuleOverlay.style.display = "none"; });
+
+  // ===== JY/JX 计数 =====
+  try {
+    const el = document.getElementById("pastPostsData");
+    if (el && el.textContent) {
+      const data = JSON.parse(el.textContent) as { author: string }[];
+      const jy = data.filter(d => d.author === "JY").length;
+      const jx = data.filter(d => d.author === "JX").length;
+      const jyEl = document.getElementById("jyCount");
+      const jxEl = document.getElementById("jxCount");
+      if (jyEl) jyEl.textContent = String(jy);
+      if (jxEl) jxEl.textContent = String(jx);
+    }
+  } catch {}
+
   // ==========================================
   // 🧩 记忆碎片拼图
   // ==========================================
@@ -25,7 +958,6 @@
     const grid = document.createElement("div");
     grid.className = "puzzle-grid";
 
-    // 随机选 6 个 emoji，每个出现 2 次
     const shuffled = [...puzzleEmojis].sort(() => Math.random() - 0.5).slice(0, 6);
     const pairs = [...shuffled, ...shuffled].sort(() => Math.random() - 0.5);
     let selected: HTMLDivElement | null = null;
@@ -79,7 +1011,6 @@
   // ==========================================
   // 📺 旧电视雪花
   // ==========================================
-  // 双击任意卡片打开电视
   document.querySelectorAll(".past-card").forEach((card) => {
     card.addEventListener("dblclick", (e) => {
       e.preventDefault();
@@ -169,7 +1100,6 @@
     lampGlow.style.top = e.clientY + "px";
   });
 
-  // 点击煤油灯区域关闭
   lampArea?.addEventListener("click", () => {
     lampOn = false;
     lampToggle?.classList.remove("active");
@@ -231,7 +1161,6 @@
     sandCtx.lineTo(e.clientX, e.clientY);
     sandCtx.stroke();
 
-    // 慢慢消散旧的线条
     if (sandPoints.length > 60) {
       sandCtx.fillStyle = "rgba(200, 170, 120, 0.02)";
       sandCtx.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
@@ -240,7 +1169,6 @@
 
   sandCanvas?.addEventListener("mouseup", () => {
     sandDrawing = false;
-    // 松手后缓慢消散
     if (sandCtx && sandCanvas) {
       const fadeOut = setInterval(() => {
         if (!sandOn || sandDrawing) { clearInterval(fadeOut); return; }
@@ -250,3 +1178,4 @@
       setTimeout(() => clearInterval(fadeOut), 5000);
     }
   });
+</script>
