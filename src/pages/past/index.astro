@@ -1,1035 +1,252 @@
----
-export const prerender = false;
-
-import { env } from "cloudflare:workers";
-import { desc, sql } from "drizzle-orm";
-import { blogPosts } from "@/db/schema";
-import Base from "@/layouts/Base.astro";
-import { getDb } from "@/lib/db";
-import { getPublicPostVisibilityCondition } from "@/lib/public-content";
-
-const articleSlug = Astro.url.searchParams.get("article");
-const page = Number(Astro.url.searchParams.get("page") || "1");
-const limit = 12;
-const offset = (page - 1) * limit;
-
-interface PastPostRow {
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  publishedAt: string | null;
-  featuredImageKey: string | null;
-  content: string;
-}
-
-let posts: PastPostRow[] = [];
-let totalPosts = 0;
-let detailPost: PastPostRow | null = null;
-
-try {
-  const db = getDb(env.DB);
-
-  if (articleSlug) {
-    const [found] = await db
-      .select({
-        title: blogPosts.title,
-        slug: blogPosts.slug,
-        excerpt: blogPosts.excerpt,
-        publishedAt: blogPosts.publishedAt,
-        featuredImageKey: blogPosts.featuredImageKey,
-        content: blogPosts.content,
-      })
-      .from(blogPosts)
-      .where(sql`${getPublicPostVisibilityCondition()} AND ${blogPosts.slug} = ${articleSlug}`)
-      .limit(1);
-    detailPost = found || null;
-  }
-
-  const [countRes] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(blogPosts)
-    .where(sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'past' OR ${blogPosts.slug} LIKE 'past/%' OR ${blogPosts.slug} LIKE 'past-%')`);
-  totalPosts = countRes?.count ?? 0;
-
-  posts = await db
-    .select({
-      title: blogPosts.title,
-      slug: blogPosts.slug,
-      excerpt: blogPosts.excerpt,
-      publishedAt: blogPosts.publishedAt,
-      featuredImageKey: blogPosts.featuredImageKey,
-      content: blogPosts.content,
-    })
-    .from(blogPosts)
-    .where(sql`${getPublicPostVisibilityCondition()} AND (${blogPosts.slug} = 'past' OR ${blogPosts.slug} LIKE 'past/%' OR ${blogPosts.slug} LIKE 'past-%')`)
-    .orderBy(desc(blogPosts.publishedAt))
-    .limit(limit)
-    .offset(offset);
-} catch (e) {
-  console.error("Past page fetch error:", e);
-}
-
-const totalPages = Math.ceil(totalPosts / limit);
-const startDateStr = "2026-03-21";
-
-function getLoveDays(startStr: string) {
-  const start = new Date(startStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-}
-const loveDays = getLoveDays(startDateStr);
-
-function getPreviewContent(content: string, maxLen = 100): string {
-  const text = content.replace(/[#*`\[\]!>\-]/g, "").replace(/\s+/g, " ").trim();
-  return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}`;
-}
-
-function formatDetailDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-const memoryIcons = ["🌸", "🍃", "🕊️", "💭", "🌙", "✨", "🫧", "🎐"];
-function getMemoryIcon(index: number): string {
-  return memoryIcons[index % memoryIcons.length];
-}
-
-// 唱片格言
-const vinylQuotes = [
-  "你是我一生只会遇见一次的惊喜",
-  "世间万物，不及你眉眼半分",
-  "想和你一起，看遍世间所有浪漫",
-  "你是我的今天，也是我的明天",
-  "我在人间贩卖黄昏，只为收集世间温柔去见你",
-  "有你的每一天，都是情人节",
-  "遇见你之后，我的世界有了光",
-  "和你在一起，连空气都是甜的",
-];
----
-
-<Base title="过往" description="那些温柔的回忆，都在这里 🕊️">
-  <div class="past-page" id="pastPage">
-    <canvas id="sakuraCanvas" class="sakura-canvas"></canvas>
-
-    {/* ===== 时间胶囊按钮 ===== */}
-    <div class="capsule-trigger" id="capsuleTrigger" title="打开时间胶囊">
-      <span class="capsule-trigger-icon">⏳</span>
-    </div>
-
-    {/* ===== 回忆瓶容器 ===== */}
-    <div class="memory-bottles" id="memoryBottles"></div>
-
-    {detailPost ? (
-      <article class="past-detail">
-        <div class="past-detail-card">
-          <header class="past-detail-hero">
-            <span class="past-detail-icon">🕊️</span>
-            <h1 class="past-detail-title">{detailPost.title}</h1>
-            <div class="past-detail-meta">
-              <span>💑 相恋 {loveDays} 天</span>
-              {detailPost.publishedAt && <span>📅 {formatDetailDate(detailPost.publishedAt)}</span>}
-            </div>
-          </header>
-          {detailPost.featuredImageKey && (
-            <div class="past-detail-image-wrap">
-              <img src={`/media/${detailPost.featuredImageKey}`} alt={detailPost.title} class="past-detail-image" />
-            </div>
-          )}
-          <div class="past-detail-body">
-            <div class="past-detail-content" set:html={detailPost.content}></div>
-          </div>
-          <footer class="past-detail-footer">
-            <a href="/past" class="past-detail-back">← 回到过往</a>
-            <div class="past-detail-hearts">🌸 🕊️ 🍃</div>
-          </footer>
-        </div>
-      </article>
-    ) : (
-      <>
-        <header class="past-hero">
-          <div class="past-hero-content">
-            <div class="past-hero-icon-row">
-              <span class="past-floating-icon">🌸</span>
-              <span class="past-floating-icon" style="animation-delay:0.5s">🕊️</span>
-              <span class="past-floating-icon" style="animation-delay:1s">🍃</span>
-            </div>
-            <h1 class="past-hero-title">过往</h1>
-            <p class="past-hero-subtitle">那些被时光温柔以待的瞬间</p>
-            <div class="past-hero-stats">
-              <div class="past-stat">
-                <span class="past-stat-num">{totalPosts}</span>
-                <span class="past-stat-label">回忆碎片</span>
-              </div>
-              <div class="past-stat-divider"></div>
-              <div class="past-stat">
-                <span class="past-stat-num">{loveDays}</span>
-                <span class="past-stat-label">一起走过</span>
-              </div>
-            </div>
-          </div>
-          <div class="past-hero-scroll">
-            <span>向下翻阅回忆</span>
-            <span class="past-scroll-arrow">↓</span>
-          </div>
-        </header>
-
-        <main class="past-main">
-          {posts.length > 0 ? (
-            <div class="past-masonry">
-              {posts.map((post, i) => {
-                const previewContent = getPreviewContent(post.content);
-                const dateStr = formatDate(post.publishedAt);
-                const icon = getMemoryIcon(i);
-
-                return (
-                  <a href={`/past?article=${post.slug}`} class="past-card-link">
-                    <article class="past-card" style={`animation-delay:${i * 0.08}s`}>
-                      {post.featuredImageKey ? (
-                        <div class="past-card-image-wrap">
-                          <img src={`/media/${post.featuredImageKey}`} alt={post.title} class="past-card-image" loading="lazy" />
-                          <div class="past-card-image-overlay">
-                            <span class="past-card-image-icon">{icon}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div class="past-card-image-wrap past-card-placeholder">
-                          <span class="past-card-placeholder-icon">{icon}</span>
-                        </div>
-                      )}
-                      <div class="past-card-body">
-                        <div class="past-card-meta">
-                          <span class="past-card-date">{dateStr}</span>
-                          <span class="past-card-icon">{icon}</span>
-                        </div>
-                        <h3 class="past-card-title">{post.title}</h3>
-                        <p class="past-card-excerpt">{post.excerpt || previewContent}</p>
-                        <span class="past-card-read">展开回忆 →</span>
-                      </div>
-                    </article>
-                  </a>
-                );
-              })}
-            </div>
-          ) : (
-            <div class="past-empty">
-              <span class="past-empty-icon">🍃</span>
-              <h3>还没有回忆</h3>
-              <p>每一段过往都会在这里安放</p>
-              <div class="past-empty-floating">
-                <span>🌸</span><span>🕊️</span><span>🍃</span><span>✨</span>
-              </div>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div class="past-pagination">
-              {page > 1 && <a href={`/past?page=${page - 1}`} class="past-page-btn">← 上一页</a>}
-              <span class="past-page-info">{page} / {totalPages}</span>
-              {page < totalPages && <a href={`/past?page=${page + 1}`} class="past-page-btn">下一页 →</a>}
-            </div>
-          )}
-        </main>
-
-        {/* ===== 旧唱片 ===== */}
-        <div class="vinyl-player" id="vinylPlayer">
-          <div class="vinyl-disc" id="vinylDisc">
-            <div class="vinyl-label">🎵</div>
-            <div class="vinyl-groove"></div>
-            <div class="vinyl-groove"></div>
-            <div class="vinyl-groove"></div>
-          </div>
-          <div class="vinyl-tonearm" id="vinylTonearm">
-            <div class="vinyl-tonearm-base"></div>
-            <div class="vinyl-tonearm-arm"></div>
-            <div class="vinyl-tonearm-head"></div>
-          </div>
-          <div class="vinyl-info" id="vinylInfo">
-            <span class="vinyl-info-icon">💿</span>
-            <span class="vinyl-info-text">点击唱片播放回忆</span>
-          </div>
-        </div>
-
-        <footer class="past-footer">
-          <p class="past-footer-text">🌸 所有的过往，都是未来的序章</p>
-          <p class="past-footer-sub">JY先生 ❤️ JX女士</p>
-        </footer>
-      </>
-    )}
-  </div>
-
-  {/* ===== 时间胶囊弹窗 ===== */}
-  <div class="capsule-overlay" id="capsuleOverlay" style="display:none">
-    <div class="capsule-modal" id="capsuleModal">
-      <div class="capsule-lid" id="capsuleLid">
-        <span class="capsule-lid-icon">⏳</span>
-      </div>
-      <div class="capsule-body">
-        <div class="capsule-content" id="capsuleContent">
-          <span class="capsule-loading">打开中...</span>
-        </div>
-      </div>
-      <button class="capsule-close" id="capsuleClose">关上胶囊</button>
-    </div>
-  </div>
-
-  {/* ===== 回忆瓶弹窗 ===== */}
-  <div class="bottle-overlay" id="bottleOverlay" style="display:none">
-    <div class="bottle-modal" id="bottleModal">
-      <div class="bottle-cork"></div>
-      <div class="bottle-glass">
-        <div class="bottle-message" id="bottleMessage"></div>
-      </div>
-      <button class="bottle-close" id="bottleClose">放回瓶子</button>
-    </div>
-  </div>
-</Base>
-
-<style is:global>
-  :root {
-    --past-pink: #ffb6ce;
-    --past-purple: #c4a0ff;
-    --past-teal: #a0d2db;
-    --past-white: rgba(255, 255, 255, 0.9);
-    --past-glass: rgba(255, 255, 255, 0.25);
-    --past-glass-border: rgba(255, 255, 255, 0.35);
-    --past-text: #4a3040;
-    --past-text-light: #9a8090;
-    --past-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
-  }
-
-  .past-page {
-    min-height: 100vh;
-    position: relative;
-    color: var(--past-text);
-    font-family: "Georgia", "Noto Serif SC", "KaiTi", serif;
-    overflow-x: hidden;
-    background: transparent;
-  }
-
-  /* ===== 樱花画布 ===== */
-  .sakura-canvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ===== 时间胶囊触发按钮 ===== */
-  .capsule-trigger {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    z-index: 100;
-    width: 60px;
-    height: 60px;
-    background: var(--past-glass);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--past-glass-border);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.06);
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    animation: capsuleFloat 3s ease-in-out infinite;
-  }
-
-  .capsule-trigger:hover {
-    transform: scale(1.15);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.1);
-  }
-
-  .capsule-trigger-icon {
-    font-size: 1.8rem;
-  }
-
-  @keyframes capsuleFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-
-  /* ===== 时间胶囊弹窗 ===== */
-  .capsule-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.15);
-    backdrop-filter: blur(6px);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .capsule-modal {
-    background: rgba(255, 245, 240, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 24px;
-    width: 90%;
-    max-width: 420px;
-    overflow: hidden;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.12);
-    animation: modalPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-
-  .capsule-lid {
-    background: linear-gradient(135deg, #d4a574, #c4956a);
-    padding: 1.2rem;
-    text-align: center;
-    position: relative;
-  }
-
-  .capsule-lid-icon {
-    font-size: 2.5rem;
-    display: block;
-    animation: capsuleFloat 2s ease-in-out infinite;
-  }
-
-  .capsule-body {
-    padding: 1.8rem;
-    text-align: center;
-    background: linear-gradient(180deg, rgba(212,165,116,0.1) 0%, transparent 30%);
-  }
-
-  .capsule-content {
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-  }
-
-  .capsule-memory-emoji {
-    font-size: 3rem;
-    animation: capsuleFloat 1.5s ease-in-out infinite;
-  }
-
-  .capsule-memory-title {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--past-text);
-  }
-
-  .capsule-memory-date {
-    font-size: 0.8rem;
-    color: var(--past-text-light);
-  }
-
-  .capsule-memory-excerpt {
-    font-size: 0.9rem;
-    color: var(--past-text-light);
-    line-height: 1.6;
-    font-style: italic;
-  }
-
-  .capsule-close {
-    width: 100%;
-    padding: 0.8rem;
-    border: none;
-    background: rgba(212,165,116,0.15);
-    color: #8b6914;
-    font-size: 0.9rem;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.3s;
-  }
-
-  .capsule-close:hover {
-    background: rgba(212,165,116,0.25);
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes modalPop {
-    from { transform: scale(0.8); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-  }
-
-  /* ===== 回忆瓶 ===== */
-  .memory-bottles {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 50;
-  }
-
-  .memory-bottle {
-    position: absolute;
-    pointer-events: auto;
-    cursor: pointer;
-    font-size: 2.5rem;
-    animation: bottleFloat 5s ease-in-out infinite;
-    transition: transform 0.3s ease;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.06));
-  }
-
-  .memory-bottle:hover {
-    transform: scale(1.3) !important;
-    animation-play-state: paused;
-  }
-
-  .memory-bottle-inner {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .memory-bottle-cork {
-    font-size: 0.6rem;
-    margin-bottom: -0.1rem;
-  }
-
-  .memory-bottle-glass {
-    font-size: 2.2rem;
-    opacity: 0.7;
-  }
-
-  @keyframes bottleFloat {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    25% { transform: translateY(-12px) rotate(3deg); }
-    75% { transform: translateY(6px) rotate(-3deg); }
-  }
-
-  /* ===== 回忆瓶弹窗 ===== */
-  .bottle-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.12);
-    backdrop-filter: blur(6px);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .bottle-modal {
-    background: rgba(230, 245, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 30% 30% 20px 20px / 15% 15% 20px 20px;
-    width: 90%;
-    max-width: 380px;
-    overflow: hidden;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.1);
-    animation: modalPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-
-  .bottle-cork {
-    height: 20px;
-    background: linear-gradient(180deg, #c4956a, #a07850);
-    border-radius: 8px 8px 0 0;
-    margin: 0 20%;
-  }
-
-  .bottle-glass {
-    padding: 1.8rem;
-    text-align: center;
-    min-height: 160px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: linear-gradient(180deg, rgba(160,210,219,0.1) 0%, rgba(255,255,255,0.5) 50%);
-  }
-
-  .bottle-message {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .bottle-message-emoji {
-    font-size: 2.5rem;
-    animation: bottleFloat 2s ease-in-out infinite;
-  }
-
-  .bottle-message-title {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--past-text);
-  }
-
-  .bottle-message-date {
-    font-size: 0.78rem;
-    color: var(--past-text-light);
-  }
-
-  .bottle-message-text {
-    font-size: 0.85rem;
-    color: var(--past-text-light);
-    line-height: 1.5;
-    font-style: italic;
-  }
-
-  .bottle-close {
-    width: 100%;
-    padding: 0.8rem;
-    border: none;
-    background: rgba(160,210,219,0.2);
-    color: #5a8a94;
-    font-size: 0.9rem;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.3s;
-    border-radius: 0 0 16px 16px;
-  }
-
-  .bottle-close:hover {
-    background: rgba(160,210,219,0.3);
-  }
-
-  /* ===== 旧唱片机 ===== */
-  .vinyl-player {
-    position: relative;
-    z-index: 1;
-    max-width: 400px;
-    margin: 3rem auto;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.5rem;
-    background: var(--past-glass);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--past-glass-border);
-    border-radius: 24px;
-    box-shadow: var(--past-shadow);
-    cursor: pointer;
-    transition: all 0.4s ease;
-    user-select: none;
-  }
-
-  .vinyl-player:hover {
-    box-shadow: 0 16px 48px rgba(0,0,0,0.08);
-    transform: translateY(-2px);
-  }
-
-  .vinyl-disc {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #1a1a1a 0%, #333 50%, #1a1a1a 100%);
-    position: relative;
-    flex-shrink: 0;
-    transition: all 0.6s ease;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-  }
-
-  .vinyl-disc.playing {
-    animation: vinylSpin 3s linear infinite;
-  }
-
-  @keyframes vinylSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  .vinyl-label {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #ff6b9d, #c4a0ff);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    z-index: 2;
-  }
-
-  .vinyl-groove {
-    position: absolute;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.06);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .vinyl-groove:nth-child(2) { width: 75px; height: 75px; }
-  .vinyl-groove:nth-child(3) { width: 60px; height: 60px; }
-  .vinyl-groove:nth-child(4) { width: 45px; height: 45px; }
-
-  .vinyl-tonearm {
-    position: relative;
-    flex-shrink: 0;
-  }
-
-  .vinyl-tonearm-base {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #666;
-  }
-
-  .vinyl-tonearm-arm {
-    width: 60px;
-    height: 3px;
-    background: #888;
-    transform: rotate(-30deg);
-    transform-origin: left center;
-    transition: transform 0.4s ease;
-    border-radius: 2px;
-  }
-
-  .vinyl-tonearm-head {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #aaa;
-    margin-left: -4px;
-  }
-
-  .vinyl-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-
-  .vinyl-info-icon {
-    font-size: 1.2rem;
-  }
-
-  .vinyl-info-text {
-    font-size: 0.82rem;
-    color: var(--past-text-light);
-    font-style: italic;
-    transition: all 0.3s ease;
-  }
-
-  /* ===== 头部 ===== */
-  .past-hero {
-    position: relative;
-    z-index: 1;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .past-hero-content { position: relative; z-index: 1; }
-  .past-hero-icon-row { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-bottom: 1.2rem; }
-  .past-floating-icon { font-size: 2rem; animation: pastFloat 3.5s ease-in-out infinite; display: inline-block; }
-
-  @keyframes pastFloat {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    30% { transform: translateY(-12px) rotate(5deg); }
-    60% { transform: translateY(-4px) rotate(-3deg); }
-  }
-
-  .past-hero-title { font-size: 3.2rem; font-weight: 300; letter-spacing: 0.15em; color: var(--past-text); margin: 0 0 0.4rem; text-shadow: 0 2px 12px rgba(255,182,206,0.2); }
-  .past-hero-subtitle { font-size: 1rem; color: var(--past-text-light); letter-spacing: 0.08em; margin: 0 0 2rem; font-style: italic; }
-  .past-hero-stats { display: flex; align-items: center; justify-content: center; gap: 1.5rem; }
-  .past-stat { text-align: center; background: var(--past-glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--past-glass-border); border-radius: 20px; padding: 1rem 1.5rem; transition: all 0.4s ease; }
-  .past-stat:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.05); }
-  .past-stat-num { display: block; font-size: 2rem; font-weight: 500; color: var(--past-text); }
-  .past-stat-label { font-size: 0.78rem; color: var(--past-text-light); letter-spacing: 0.06em; }
-  .past-stat-divider { width: 1px; height: 40px; background: rgba(0,0,0,0.06); }
-  .past-hero-scroll { position: absolute; bottom: 2rem; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; color: var(--past-text-light); font-size: 0.8rem; animation: pastScrollBounce 2s ease-in-out infinite; }
-
-  @keyframes pastScrollBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(6px); }
-  }
-
-  /* ===== 卡片 ===== */
-  .past-main { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto 4rem; padding: 0 1.5rem; }
-  .past-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
-  .past-card-link { text-decoration: none; color: inherit; display: block; }
-  .past-card { background: var(--past-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--past-glass-border); border-radius: 20px; overflow: hidden; transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1.2); animation: pastCardFade 0.8s ease forwards; opacity: 0; }
-  @keyframes pastCardFade { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-  .past-card:hover { transform: translateY(-8px); box-shadow: 0 20px 60px rgba(0,0,0,0.06); border-color: rgba(255,182,206,0.5); }
-  .past-card-image-wrap { position: relative; width: 100%; height: 200px; overflow: hidden; background: linear-gradient(135deg, rgba(255,182,206,0.1), rgba(196,160,255,0.1)); }
-  .past-card-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s ease; }
-  .past-card:hover .past-card-image { transform: scale(1.06); }
-  .past-card-image-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.4s ease; background: rgba(255,255,255,0.3); }
-  .past-card:hover .past-card-image-overlay { opacity: 1; }
-  .past-card-image-icon { font-size: 2.5rem; animation: pastFloat 2s ease-in-out infinite; }
-  .past-card-placeholder { display: flex; align-items: center; justify-content: center; height: 140px; }
-  .past-card-placeholder-icon { font-size: 3rem; opacity: 0.5; animation: pastFloat 3s ease-in-out infinite; }
-  .past-card-body { padding: 1rem 1.2rem 1.2rem; }
-  .past-card-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
-  .past-card-date { font-size: 0.75rem; color: var(--past-text-light); letter-spacing: 0.04em; }
-  .past-card-icon { font-size: 1rem; }
-  .past-card-title { font-size: 1.05rem; font-weight: 500; color: var(--past-text); margin: 0 0 0.4rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .past-card-excerpt { font-size: 0.82rem; color: var(--past-text-light); line-height: 1.6; margin: 0 0 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .past-card-read { font-size: 0.8rem; color: var(--past-purple); font-weight: 500; transition: all 0.3s ease; }
-  .past-card:hover .past-card-read { letter-spacing: 0.06em; }
-
-  /* ===== 详情页 ===== */
-  .past-detail { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
-  .past-detail-card { background: var(--past-glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--past-glass-border); border-radius: 24px; padding: 2rem; box-shadow: var(--past-shadow); }
-  .past-detail-hero { text-align: center; margin-bottom: 1.5rem; }
-  .past-detail-icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
-  .past-detail-title { font-size: 1.6rem; font-weight: 500; color: var(--past-text); margin: 0 0 0.5rem; }
-  .past-detail-meta { display: flex; gap: 1rem; justify-content: center; font-size: 0.82rem; color: var(--past-text-light); }
-  .past-detail-image-wrap { border-radius: 16px; overflow: hidden; margin-bottom: 1.5rem; }
-  .past-detail-image { width: 100%; display: block; }
-  .past-detail-body { margin-bottom: 1.5rem; }
-  .past-detail-content { font-size: 1rem; color: #5a4050; line-height: 1.9; }
-  .past-detail-content :global(h2),.past-detail-content :global(h3){color:var(--past-text);font-weight:500;margin-top:1.5rem;margin-bottom:.6rem}
-  .past-detail-content :global(p){margin:0 0 1rem}
-  .past-detail-content :global(img){max-width:100%;border-radius:12px;margin:1rem 0}
-  .past-detail-content :global(blockquote){border-left:3px solid var(--past-pink);margin:1rem 0;padding:.5rem 1rem;background:rgba(255,182,206,0.08);border-radius:0 8px 8px 0;color:var(--past-text-light);font-style:italic}
-  .past-detail-footer { text-align: center; padding-top: 1.5rem; border-top: 1px solid rgba(0,0,0,0.04); }
-  .past-detail-back { display: inline-flex; padding: .5rem 1.2rem; border: 1px solid var(--past-glass-border); border-radius: 999px; color: var(--past-text); text-decoration: none; font-size: .85rem; transition: all .3s; margin-bottom: .8rem; background: rgba(255,255,255,0.3); }
-  .past-detail-back:hover { background: rgba(255,255,255,0.6); transform: translateX(-4px); }
-  .past-detail-hearts { color: var(--past-pink); letter-spacing: .2rem; }
-
-  /* ===== 空状态 ===== */
-  .past-empty { text-align: center; padding: 4rem 1rem; background: var(--past-glass); backdrop-filter: blur(16px); border: 1px solid var(--past-glass-border); border-radius: 24px; }
-  .past-empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
-  .past-empty h3 { font-size: 1.2rem; font-weight: 400; color: var(--past-text); margin: 0 0 .4rem; }
-  .past-empty p { color: var(--past-text-light); margin: 0 0 1rem; font-size: 0.9rem; }
-  .past-empty-floating { display: flex; gap: .6rem; justify-content: center; font-size: 1.2rem; }
-  .past-empty-floating span { animation: pastFloat 2.5s ease-in-out infinite; }
-  .past-empty-floating span:nth-child(2){animation-delay:.4s}
-  .past-empty-floating span:nth-child(3){animation-delay:.8s}
-  .past-empty-floating span:nth-child(4){animation-delay:1.2s}
-
-  /* ===== 分页 ===== */
-  .past-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding-top: 2rem; }
-  .past-page-btn { padding: .5rem 1rem; border: 1px solid var(--past-glass-border); border-radius: 999px; color: var(--past-text); text-decoration: none; font-size: .85rem; background: var(--past-glass); backdrop-filter: blur(12px); transition: all .3s; }
-  .past-page-btn:hover { background: rgba(255,255,255,0.5); transform: translateY(-2px); }
-  .past-page-info { font-size: .85rem; color: var(--past-text-light); }
-
-  /* ===== 底部 ===== */
-  .past-footer { position: relative; z-index: 1; text-align: center; padding: 3rem 1rem; }
-  .past-footer-text { font-size: .95rem; color: var(--past-text-light); margin: 0 0 .3rem; font-style: italic; }
-  .past-footer-sub { font-size: .82rem; color: var(--past-pink); margin: 0; font-weight: 500; }
-
-  @media (max-width: 768px) {
-    .past-hero-title { font-size: 2.4rem; }
-    .past-masonry { grid-template-columns: 1fr; }
-    .past-detail-card { padding: 1.5rem; }
-    .vinyl-player { flex-direction: column; text-align: center; max-width: 280px; }
-    .capsule-trigger { bottom: 1.5rem; right: 1rem; width: 48px; height: 48px; }
-    .capsule-trigger-icon { font-size: 1.4rem; }
-  }
-</style>
-
-<script>
-  // ===== 樱花飘落引擎 =====
-  const canvas = document.getElementById("sakuraCanvas") as HTMLCanvasElement | null;
-  if (canvas) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas not supported");
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-    window.addEventListener("resize", () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    });
-
-    interface Petal {
-      x: number; y: number; size: number; speedX: number; speedY: number;
-      rotation: number; rotationSpeed: number; opacity: number; type: number;
-      wobble: number; wobbleSpeed: number;
-    }
-    const petals: Petal[] = [];
-    for (let i = 0; i < 45; i++) {
-      petals.push({
-        x: Math.random() * width, y: Math.random() * height - height,
-        size: Math.random() * 14 + 8, speedX: Math.random() * 1.5 - 0.5,
-        speedY: Math.random() * 1.2 + 0.6, rotation: Math.random() * 360,
-        rotationSpeed: Math.random() * 2 - 1, opacity: Math.random() * 0.5 + 0.3,
-        type: Math.floor(Math.random() * 3), wobble: Math.random() * Math.PI * 2,
-        wobbleSpeed: Math.random() * 0.02 + 0.01,
-      });
-    }
-
-    function drawPetal(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, rotation: number, opacity: number, type: number) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate((rotation * Math.PI) / 180); ctx.globalAlpha = opacity;
-      const colors = [["#ffb6ce","#ffd4e0"],["#ffe4ea","#fff0f3"],["#ffc4d8","#ffdde8"]];
-      const [c1, c2] = colors[type] || colors[0];
-      ctx.beginPath();
-      const w = size * 0.5, h = size * 0.7;
-      ctx.ellipse(-w * 0.25, 0, w, h, 0, 0, Math.PI * 2);
-      ctx.ellipse(w * 0.25, 0, w, h, 0, 0, Math.PI * 2);
-      const grad = ctx.createRadialGradient(0, 0, size * 0.1, 0, 0, size * 0.6);
-      grad.addColorStop(0, c2); grad.addColorStop(0.6, c1); grad.addColorStop(1, "transparent");
-      ctx.fillStyle = grad; ctx.fill();
-      ctx.restore();
-    }
-
-    function animate() {
-      ctx!.clearRect(0, 0, width, height);
-      for (const p of petals) {
-        p.wobble += p.wobbleSpeed;
-        p.x += p.speedX + Math.sin(p.wobble) * 0.12;
-        p.y += p.speedY;
-        p.rotation += p.rotationSpeed;
-        if (p.y > height + 40) { p.y = -40; p.x = Math.random() * width; }
-        if (p.x > width + 40) p.x = -40;
-        if (p.x < -40) p.x = width + 40;
-        drawPetal(ctx!, p.x, p.y, p.size, p.rotation, p.opacity, p.type);
-      }
-      requestAnimationFrame(animate);
-    }
-    animate();
-  }
-
-  // ===== 点击花瓣散开 =====
-  const pastPage = document.getElementById("pastPage");
-  pastPage?.addEventListener("click", (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) return;
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 * i) / 8;
-      const dist = 60 + Math.random() * 40;
-      const petal = document.createElement("div");
-      petal.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;font-size:${Math.random()*12+12}px;pointer-events:none;z-index:999;transition:all .8s cubic-bezier(.25,.8,.25,1);opacity:.8`;
-      petal.textContent = ["🌸","🍃","✨","🕊️"][Math.floor(Math.random()*4)];
-      document.body.appendChild(petal);
-      requestAnimationFrame(() => {
-        petal.style.transform = `translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist}px) rotate(${Math.random()*180}deg)`;
-        petal.style.opacity = "0";
-      });
-      setTimeout(() => petal.remove(), 900);
-    }
-  });
-
-  // ===== 时间胶囊 =====
-  const capsuleTrigger = document.getElementById("capsuleTrigger");
-  const capsuleOverlay = document.getElementById("capsuleOverlay");
-  const capsuleContent = document.getElementById("capsuleContent");
-  const capsuleClose = document.getElementById("capsuleClose");
-
-  const capsuleMemories: { emoji: string; title: string; date: string; excerpt: string }[] = (() => {
-    try {
-      return (window as any).__pastPostsData || [];
-    } catch { return []; }
-  })();
-
-  function openCapsule() {
-    if (!capsuleOverlay || !capsuleContent) return;
-    const mems = capsuleMemories.length > 0 ? capsuleMemories : [
-      { emoji: "🌸", title: "还没有回忆", date: "未来", excerpt: "每一段过往都会成为时间胶囊里的宝藏" }
-    ];
-    const mem = mems[Math.floor(Math.random() * mems.length)];
-    capsuleContent.innerHTML = `
-      <span class="capsule-memory-emoji">${mem.emoji}</span>
-      <div class="capsule-memory-title">${mem.title}</div>
-      <div class="capsule-memory-date">${mem.date}</div>
-      <p class="capsule-memory-excerpt">${mem.excerpt}</p>
-    `;
-    capsuleOverlay.style.display = "flex";
-  }
-
-  capsuleTrigger?.addEventListener("click", openCapsule);
-  capsuleClose?.addEventListener("click", () => { if (capsuleOverlay) capsuleOverlay.style.display = "none"; });
-  capsuleOverlay?.addEventListener("click", (e) => { if (e.target === capsuleOverlay) capsuleOverlay.style.display = "none"; });
-
-  // 把文章数据注入时间胶囊
-  (window as any).__pastPostsData = [
-    { emoji: "🌸", title: "最初的相遇", date: "2026.03.21", excerpt: "那一天，我们的故事开始了..." },
-    { emoji: "💕", title: "第一次约会", date: "回忆中", excerpt: "紧张又甜蜜的那一天，阳光正好" },
-    { emoji: "🌙", title: "深夜长谈", date: "某个夜晚", excerpt: "说不完的话，停不下的笑声" },
-    { emoji: "🎁", title: "惊喜礼物", date: "特别的日子", excerpt: "你笑得像个孩子，那一刻我想永远记住" },
-    { emoji: "🕊️", title: "一起旅行", date: "旅途中的记忆", excerpt: "手牵手走过的每一条街都闪闪发光" },
-  ];
-
-  // ===== 回忆瓶 =====
-  const memoryBottles = document.getElementById("memoryBottles");
-  const bottleOverlay = document.getElementById("bottleOverlay");
-  const bottleMessage = document.getElementById("bottleMessage");
-  const bottleClose = document.getElementById("bottleClose");
-
-  const bottleData = [
-    { emoji: "💌", title: "给你的第一封信", date: "2026.03.21", text: "从那天起，我的世界有了不一样的色彩..." },
-    { emoji: "🌹", title: "情人节", date: "甜蜜回忆", text: "那天你送的花，我一直珍藏在心里" },
-    { emoji: "🌟", title: "许愿", date: "星空下", text: "一起许下的愿望，正在一个接一个实现" },
-    { emoji: "🍃", title: "秋天的约定", date: "某个午后", text: "你说要一起去看遍世界，我一直在等" },
-    { emoji: "🎐", title: "风铃的记忆", date: "夏天", text: "风吹过风铃的声音，像你的笑声一样好听" },
-  ];
-
-  if (memoryBottles) {
-    const positions = [
-      { top: "15%", left: "8%" },
-      { top: "30%", left: "85%" },
-      { top: "55%", left: "5%" },
-      { top: "70%", left: "90%" },
-      { top: "85%", left: "15%" },
-    ];
-
-    positions.forEach((pos, i) => {
-      const bottle = document.createElement("div");
-      bottle.className = "memory-bottle";
-      bottle.style.top = pos.top;
-      bottle.style.left = pos.left;
-      bottle.style.animationDelay = `${i * 0.7}s`;
-      bottle.style.animationDuration = `${4 + Math.random() * 3}s`;
-      bottle.innerHTML = `
-        <div class="memory-bottle-inner">
-          <span class="memory-bottle-cork">🟤</span>
-          <span class="memory-bottle-glass">🫙</span>
-        </div>
-      `;
-      bottle.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const data = bottleData[i % bottleData.length];
-        if (bottleMessage) {
-          bottleMessage.innerHTML = `
-            <span class="bottle-message-emoji">${data.emoji}</span>
-            <div class="bottle-message-title">${data.title}</div>
-            <div class="bottle-message-date">${data.date}</div>
-            <p class="bottle-message-text">${data.text}</p>
-          `;
+  // ==========================================
+  // 🧩 记忆碎片拼图
+  // ==========================================
+  const puzzleTrigger = document.getElementById("puzzleTrigger");
+  const puzzleEmojis = ["📷","🎞️","📼","🕰️","📜","🍂","☕","🚂","🏠"];
+  let puzzleOpen = false;
+
+  puzzleTrigger?.addEventListener("click", () => {
+    if (puzzleOpen) return;
+    puzzleOpen = true;
+
+    const overlay = document.createElement("div");
+    overlay.className = "puzzle-overlay";
+
+    const board = document.createElement("div");
+    board.className = "puzzle-board";
+
+    const title = document.createElement("h3");
+    title.textContent = "🧩 记忆碎片拼图";
+    title.style.margin = "0 0 0.5rem";
+    title.style.color = "var(--past-text)";
+    title.style.fontWeight = "400";
+    board.appendChild(title);
+
+    const grid = document.createElement("div");
+    grid.className = "puzzle-grid";
+
+    // 随机选 6 个 emoji，每个出现 2 次
+    const shuffled = [...puzzleEmojis].sort(() => Math.random() - 0.5).slice(0, 6);
+    const pairs = [...shuffled, ...shuffled].sort(() => Math.random() - 0.5);
+    let selected: HTMLDivElement | null = null;
+    let matched = 0;
+
+    pairs.forEach((emoji) => {
+      const piece = document.createElement("div");
+      piece.className = "puzzle-piece";
+      piece.textContent = emoji;
+      piece.dataset.emoji = emoji;
+
+      piece.addEventListener("click", () => {
+        if (piece.classList.contains("matched") || piece === selected) return;
+
+        if (selected && selected.dataset.emoji === emoji) {
+          piece.classList.add("matched");
+          selected.classList.add("matched");
+          selected.classList.remove("selected");
+          piece.classList.remove("selected");
+          selected = null;
+          matched += 2;
+          if (matched === 12) {
+            const complete = document.createElement("div");
+            complete.className = "puzzle-complete";
+            complete.textContent = "✨ 拼图完成！那些从前的碎片，拼成了现在的你 ✨";
+            grid.appendChild(complete);
+          }
+        } else {
+          if (selected) selected.classList.remove("selected");
+          piece.classList.add("selected");
+          selected = piece;
         }
-        if (bottleOverlay) bottleOverlay.style.display = "flex";
       });
-      memoryBottles.appendChild(bottle);
+
+      grid.appendChild(piece);
     });
-  }
 
-  bottleClose?.addEventListener("click", () => { if (bottleOverlay) bottleOverlay.style.display = "none"; });
-  bottleOverlay?.addEventListener("click", (e) => { if (e.target === bottleOverlay) bottleOverlay.style.display = "none"; });
+    board.appendChild(grid);
 
-  // ===== 旧唱片机 =====
-  const vinylPlayer = document.getElementById("vinylPlayer");
-  const vinylDisc = document.getElementById("vinylDisc");
-  const vinylInfo = document.getElementById("vinylInfo");
+    const close = document.createElement("button");
+    close.className = "puzzle-close";
+    close.textContent = "收起拼图";
+    close.addEventListener("click", () => { overlay.remove(); puzzleOpen = false; });
 
-  let isPlaying = false;
-  let quoteIndex = 0;
-
-  vinylPlayer?.addEventListener("click", () => {
-    if (isPlaying) {
-      vinylDisc?.classList.remove("playing");
-      if (vinylInfo) vinylInfo.innerHTML = `<span class="vinyl-info-icon">💿</span><span class="vinyl-info-text">点击唱片播放回忆</span>`;
-    } else {
-      vinylDisc?.classList.add("playing");
-      const quote = vinylQuotes[quoteIndex % vinylQuotes.length];
-      if (vinylInfo) vinylInfo.innerHTML = `<span class="vinyl-info-icon">🎵</span><span class="vinyl-info-text">${quote}</span>`;
-      quoteIndex++;
-    }
-    isPlaying = !isPlaying;
+    board.appendChild(close);
+    overlay.appendChild(board);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.remove(); puzzleOpen = false; } });
+    document.body.appendChild(overlay);
   });
-</script>
+
+  // ==========================================
+  // 📺 旧电视雪花
+  // ==========================================
+  // 双击任意卡片打开电视
+  document.querySelectorAll(".past-card").forEach((card) => {
+    card.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      const title = (card.querySelector(".past-card-title") as HTMLElement)?.textContent || "无题";
+      const date = (card.querySelector(".past-card-date") as HTMLElement)?.textContent || "";
+      const excerpt = (card.querySelector(".past-card-excerpt") as HTMLElement)?.textContent || "";
+
+      const overlay = document.createElement("div");
+      overlay.className = "tv-overlay";
+
+      const screen = document.createElement("div");
+      screen.className = "tv-screen";
+
+      const staticDiv = document.createElement("div");
+      staticDiv.className = "tv-static";
+      staticDiv.id = "tvStaticArea";
+
+      const reveal = document.createElement("div");
+      reveal.className = "tv-reveal";
+      reveal.style.display = "none";
+      reveal.innerHTML = `
+        <div class="tv-reveal-title">${title}</div>
+        <div class="tv-reveal-date">${date}</div>
+        <p class="tv-reveal-text">"${excerpt}"</p>
+      `;
+
+      staticDiv.appendChild(reveal);
+      screen.appendChild(staticDiv);
+
+      const knobRow = document.createElement("div");
+      knobRow.className = "tv-knob-row";
+      const knob = document.createElement("div");
+      knob.className = "tv-knob";
+      knob.textContent = "📺";
+      knob.title = "点击调台";
+      knob.addEventListener("click", () => {
+        if (reveal.style.display === "none") {
+          staticDiv.style.animation = "none";
+          reveal.style.display = "flex";
+        } else {
+          staticDiv.style.animation = "tvStatic 0.1s infinite";
+          reveal.style.display = "none";
+        }
+      });
+      const light = document.createElement("div");
+      light.className = "tv-power-light";
+      knobRow.appendChild(knob);
+      knobRow.appendChild(light);
+      screen.appendChild(knobRow);
+
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "tv-close";
+      closeBtn.textContent = "关掉电视";
+      closeBtn.addEventListener("click", () => overlay.remove());
+      screen.appendChild(closeBtn);
+
+      overlay.appendChild(screen);
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+    });
+  });
+
+  // ==========================================
+  // 🪔 煤油灯
+  // ==========================================
+  const lampToggle = document.getElementById("lampToggle");
+  const lampArea = document.getElementById("lampArea");
+  const lampGlow = document.getElementById("lampGlow");
+  let lampOn = false;
+
+  lampToggle?.addEventListener("click", () => {
+    lampOn = !lampOn;
+    if (lampOn) {
+      lampToggle.classList.add("active");
+      if (lampArea) lampArea.style.display = "block";
+      document.body.style.cursor = "none";
+    } else {
+      lampToggle.classList.remove("active");
+      if (lampArea) lampArea.style.display = "none";
+      document.body.style.cursor = "";
+    }
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!lampOn || !lampGlow) return;
+    lampGlow.style.left = e.clientX + "px";
+    lampGlow.style.top = e.clientY + "px";
+  });
+
+  // 点击煤油灯区域关闭
+  lampArea?.addEventListener("click", () => {
+    lampOn = false;
+    lampToggle?.classList.remove("active");
+    if (lampArea) lampArea.style.display = "none";
+    document.body.style.cursor = "";
+  });
+
+  // ==========================================
+  // 🏜️ 沙画
+  // ==========================================
+  const sandToggle = document.getElementById("sandToggle");
+  const sandCanvas = document.getElementById("sandCanvas") as HTMLCanvasElement | null;
+  const sandHint = document.getElementById("sandHint");
+  let sandOn = false;
+  let sandCtx: CanvasRenderingContext2D | null = null;
+  let sandDrawing = false;
+  let sandPoints: { x: number; y: number }[] = [];
+
+  sandToggle?.addEventListener("click", () => {
+    sandOn = !sandOn;
+    if (sandOn) {
+      sandToggle.classList.add("active");
+      sandCanvas?.classList.add("active");
+      if (sandHint) sandHint.classList.add("active");
+      if (sandCanvas) {
+        sandCanvas.width = innerWidth;
+        sandCanvas.height = innerHeight;
+        sandCtx = sandCanvas.getContext("2d");
+        if (sandCtx) {
+          sandCtx.fillStyle = "rgba(200, 170, 120, 0.15)";
+          sandCtx.fillRect(0, 0, sandCanvas.width, sandCanvas.height);
+        }
+      }
+      document.body.style.cursor = "crosshair";
+    } else {
+      sandToggle.classList.remove("active");
+      sandCanvas?.classList.remove("active");
+      if (sandHint) sandHint.classList.remove("active");
+      document.body.style.cursor = "";
+      sandPoints = [];
+    }
+  });
+
+  sandCanvas?.addEventListener("mousedown", (e) => {
+    if (!sandOn || !sandCtx) return;
+    sandDrawing = true;
+    sandPoints = [{ x: e.clientX, y: e.clientY }];
+  });
+
+  sandCanvas?.addEventListener("mousemove", (e) => {
+    if (!sandOn || !sandDrawing || !sandCtx) return;
+    sandPoints.push({ x: e.clientX, y: e.clientY });
+    sandCtx.strokeStyle = "rgba(180, 140, 100, 0.5)";
+    sandCtx.lineWidth = 8;
+    sandCtx.lineCap = "round";
+    sandCtx.lineJoin = "round";
+    sandCtx.beginPath();
+    sandCtx.moveTo(sandPoints[sandPoints.length - 2]?.x || e.clientX, sandPoints[sandPoints.length - 2]?.y || e.clientY);
+    sandCtx.lineTo(e.clientX, e.clientY);
+    sandCtx.stroke();
+
+    // 慢慢消散旧的线条
+    if (sandPoints.length > 60) {
+      sandCtx.fillStyle = "rgba(200, 170, 120, 0.02)";
+      sandCtx.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
+    }
+  });
+
+  sandCanvas?.addEventListener("mouseup", () => {
+    sandDrawing = false;
+    // 松手后缓慢消散
+    if (sandCtx && sandCanvas) {
+      const fadeOut = setInterval(() => {
+        if (!sandOn || sandDrawing) { clearInterval(fadeOut); return; }
+        sandCtx!.fillStyle = "rgba(200, 170, 120, 0.015)";
+        sandCtx!.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
+      }, 100);
+      setTimeout(() => clearInterval(fadeOut), 5000);
+    }
+  });
