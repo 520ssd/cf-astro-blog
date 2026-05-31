@@ -97,59 +97,56 @@ const pastQuotes = [
   <div class="past-page" id="pastPage">
     <canvas id="leafCanvas" class="leaf-canvas"></canvas>
 
+    {/* ===== 全屏雨声覆盖层 ===== */}
+    <div class="rain-fullscreen" id="rainFullscreen" style="display:none">
+      <div class="rain-fullscreen-drops" id="rainFullscreenDrops"></div>
+      <div class="rain-fullscreen-text" id="rainFullscreenText">
+        <span>☔ 窗外下着雨</span>
+        <span>适合安静地回忆从前</span>
+      </div>
+      <div class="rain-fullscreen-controls">
+        <button class="rain-fs-btn" id="rainFSToggle">⏯️ 暂停雨</button>
+        <button class="rain-fs-btn" id="rainFSClose">关上窗户</button>
+      </div>
+    </div>
+
     {/* ===== 浮动按钮组 ===== */}
     <div class="floating-buttons">
-      {/* 时间胶囊 */}
       <div class="float-btn" id="capsuleTrigger" title="时间胶囊">
         <span class="float-btn-icon">⏳</span>
         <span class="float-btn-label">胶囊</span>
       </div>
-
-      {/* 雨声窗台 */}
       <div class="float-btn" id="rainWindowToggle" title="雨声窗台">
         <span class="float-btn-icon">🪟</span>
         <span class="float-btn-label">听雨</span>
       </div>
-
-      {/* 旧式留声机 */}
       <div class="float-btn" id="phonographToggle" title="旧式留声机">
         <span class="float-btn-icon">📯</span>
         <span class="float-btn-label">留声</span>
       </div>
-
-      {/* 旧电视 */}
       <div class="float-btn" id="tvToggle" title="老电视">
         <span class="float-btn-icon">📺</span>
         <span class="float-btn-label">电视</span>
       </div>
-
-      {/* 沙画 */}
       <div class="float-btn" id="sandToggle" title="沙画">
         <span class="float-btn-icon">🏜️</span>
         <span class="float-btn-label">沙画</span>
       </div>
-    </div>
-
-    {/* ===== 沙画画布 ===== */}
-    <canvas class="sand-canvas" id="sandCanvas"></canvas>
-    <div class="sand-hint" id="sandHint">🖐️ 按住鼠标拖拽画沙，松手后慢慢消散</div>
-
-    {/* ===== 雨声窗台弹窗 ===== */}
-    <div class="rain-overlay" id="rainOverlay" style="display:none">
-      <div class="rain-window">
-        <div class="rain-glass" id="rainGlass">
-          <div class="rain-drops" id="rainDrops"></div>
-          <div class="rain-text" id="rainText">
-            <span>☔ 窗外下着雨</span>
-            <span>适合安静地回忆从前</span>
-          </div>
-        </div>
-        <div class="rain-controls">
-          <button class="rain-btn" id="rainToggle">⏯️ 暂停雨</button>
-          <button class="rain-btn" id="rainClose">关上窗户</button>
-        </div>
+      <div class="float-btn" id="fireflyToggle" title="萤火虫">
+        <span class="float-btn-icon">✨</span>
+        <span class="float-btn-label">萤火</span>
+      </div>
+      <div class="float-btn" id="bubbleToggle" title="吹泡泡">
+        <span class="float-btn-icon">🫧</span>
+        <span class="float-btn-label">泡泡</span>
       </div>
     </div>
+
+    {/* ===== 特效画布 ===== */}
+    <canvas class="sand-canvas" id="sandCanvas"></canvas>
+    <canvas class="firefly-canvas" id="fireflyCanvas"></canvas>
+    <div class="bubble-container" id="bubbleContainer"></div>
+    <div class="sand-hint" id="sandHint">🖐️ 按住鼠标拖拽画沙，松手后慢慢消散</div>
 
     {/* ===== 留声机弹窗 ===== */}
     <div class="phono-overlay" id="phonoOverlay" style="display:none">
@@ -209,11 +206,13 @@ const pastQuotes = [
             <div class="past-hero-quote" id="pastQuote">"{pastQuotes[0]}"</div>
             <div class="past-hero-stats">
               <div class="past-stat">
+                <span class="past-stat-avatar">👦</span>
                 <span class="past-stat-label">JY</span>
                 <span class="past-stat-num" id="jyCount">0</span>
               </div>
               <div class="past-stat-divider"></div>
               <div class="past-stat">
+                <span class="past-stat-avatar">👧</span>
                 <span class="past-stat-label">JX</span>
                 <span class="past-stat-num" id="jxCount">0</span>
               </div>
@@ -294,8 +293,6 @@ const pastQuotes = [
 
 <style is:global>
   :root {
-    --past-warm: #d4b896;
-    --past-paper: rgba(252, 248, 240, 0.85);
     --past-glass: rgba(252, 248, 240, 0.55);
     --past-border: rgba(180, 150, 120, 0.3);
     --past-text: #3a2a1a;
@@ -323,6 +320,92 @@ const pastQuotes = [
     z-index: 0;
   }
 
+  /* ===== 全屏雨声 ===== */
+  .rain-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    background: linear-gradient(180deg, #1a1a2a 0%, #0d0d1a 100%);
+    overflow: hidden;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .rain-fullscreen-drops {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .rain-fullscreen-drop {
+    position: absolute;
+    width: 2px;
+    background: linear-gradient(180deg, transparent 0%, rgba(180,200,220,0.7) 40%, rgba(200,220,240,0.9) 100%);
+    animation: fsRainFall linear infinite;
+    border-radius: 0 0 2px 2px;
+  }
+
+  @keyframes fsRainFall {
+    0% { transform: translateY(-10vh); opacity: 0; }
+    5% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh); opacity: 0; }
+  }
+
+  .rain-fullscreen-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    color: rgba(220,200,180,0.9);
+    font-size: 1.4rem;
+    font-style: italic;
+    text-shadow: 0 0 30px rgba(200,180,150,0.4);
+    animation: rainTextPulse 3s ease-in-out infinite;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  @keyframes rainTextPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  .rain-fullscreen-controls {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    display: flex;
+    gap: 1rem;
+  }
+
+  .rain-fs-btn {
+    padding: 0.6rem 1.5rem;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    color: #ccc;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9rem;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s;
+  }
+
+  .rain-fs-btn:hover {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border-color: rgba(255,255,255,0.3);
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
   /* ===== 浮动按钮组 ===== */
   .floating-buttons {
     position: fixed;
@@ -331,16 +414,16 @@ const pastQuotes = [
     z-index: 100;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
 
   .float-btn {
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
     background: var(--past-glass);
     backdrop-filter: blur(16px);
     border: 1px solid var(--past-border);
-    border-radius: 16px;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -348,36 +431,63 @@ const pastQuotes = [
     cursor: pointer;
     box-shadow: var(--past-shadow);
     transition: all 0.3s ease;
-    position: relative;
     animation: btnFloat 3s ease-in-out infinite;
   }
   .float-btn:nth-child(1) { animation-delay: 0s; }
-  .float-btn:nth-child(2) { animation-delay: 0.4s; }
-  .float-btn:nth-child(3) { animation-delay: 0.8s; }
-  .float-btn:nth-child(4) { animation-delay: 1.2s; }
-  .float-btn:nth-child(5) { animation-delay: 1.6s; }
+  .float-btn:nth-child(2) { animation-delay: 0.3s; }
+  .float-btn:nth-child(3) { animation-delay: 0.6s; }
+  .float-btn:nth-child(4) { animation-delay: 0.9s; }
+  .float-btn:nth-child(5) { animation-delay: 1.2s; }
+  .float-btn:nth-child(6) { animation-delay: 1.5s; }
+  .float-btn:nth-child(7) { animation-delay: 1.8s; }
 
   @keyframes btnFloat {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
+    50% { transform: translateY(-4px); }
   }
 
   .float-btn:hover {
-    transform: scale(1.12) translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    transform: scale(1.15) translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
     border-color: var(--past-accent);
   }
 
-  .float-btn-icon {
-    font-size: 1.3rem;
-    line-height: 1;
+  .float-btn-icon { font-size: 1.2rem; line-height: 1; }
+  .float-btn-label { font-size: 0.5rem; color: var(--past-text-light); letter-spacing: 0.04em; margin-top: 1px; }
+
+  /* ===== 萤火虫画布 ===== */
+  .firefly-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+  }
+  .firefly-canvas.active { display: block; }
+
+  /* ===== 泡泡容器 ===== */
+  .bubble-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+  }
+  .bubble-container.active { display: block; }
+
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.6) 0%, rgba(200,180,220,0.3) 40%, rgba(180,160,200,0.1) 100%);
+    border: 1px solid rgba(255,255,255,0.4);
+    animation: bubbleRise linear forwards;
+    pointer-events: none;
   }
 
-  .float-btn-label {
-    font-size: 0.55rem;
-    color: var(--past-text-light);
-    letter-spacing: 0.04em;
-    margin-top: 1px;
+  @keyframes bubbleRise {
+    0% { transform: translateY(0) scale(0.5); opacity: 0.8; }
+    20% { transform: translateY(-20vh) scale(1); opacity: 1; }
+    100% { transform: translateY(-110vh) scale(1.2); opacity: 0; }
   }
 
   /* ===== 沙画 ===== */
@@ -388,10 +498,7 @@ const pastQuotes = [
     z-index: 9998;
     display: none;
   }
-  .sand-canvas.active {
-    display: block;
-    pointer-events: auto;
-  }
+  .sand-canvas.active { display: block; pointer-events: auto; }
   .sand-hint {
     position: fixed;
     top: 1rem;
@@ -407,102 +514,6 @@ const pastQuotes = [
     display: none;
   }
   .sand-hint.active { display: block; }
-
-  /* ===== 雨声窗台 ===== */
-  .rain-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.3);
-    backdrop-filter: blur(6px);
-    z-index: 10001;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.3s ease;
-  }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  .rain-window {
-    width: 90%;
-    max-width: 500px;
-    background: #3a3a4a;
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 20px 80px rgba(0,0,0,0.3);
-    border: 6px solid #5a4a3a;
-  }
-
-  .rain-glass {
-    height: 300px;
-    background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 50%, #2a2a3a 100%);
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .rain-drops {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .rain-drop {
-    position: absolute;
-    width: 2px;
-    background: linear-gradient(180deg, transparent 0%, rgba(180,200,220,0.6) 50%, rgba(200,220,240,0.8) 100%);
-    animation: rainFall linear infinite;
-    border-radius: 0 0 2px 2px;
-  }
-
-  @keyframes rainFall {
-    0% { transform: translateY(-100%); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { transform: translateY(320px); opacity: 0; }
-  }
-
-  .rain-text {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    color: rgba(220,200,180,0.9);
-    font-size: 1.1rem;
-    font-style: italic;
-    text-shadow: 0 0 20px rgba(200,180,150,0.3);
-    animation: rainTextPulse 3s ease-in-out infinite;
-  }
-
-  @keyframes rainTextPulse {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 1; }
-  }
-
-  .rain-controls {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.8rem;
-    background: #4a3a3a;
-  }
-
-  .rain-btn {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    background: rgba(255,255,255,0.05);
-    color: #ccc;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.82rem;
-    transition: all 0.3s;
-  }
-
-  .rain-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
   /* ===== 留声机 ===== */
   .phono-overlay {
@@ -526,7 +537,6 @@ const pastQuotes = [
     text-align: center;
     box-shadow: 0 24px 80px rgba(0,0,0,0.4);
     border: 3px solid #6a4a3a;
-    position: relative;
   }
 
   .phono-turntable {
@@ -538,7 +548,6 @@ const pastQuotes = [
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   }
 
@@ -548,12 +557,9 @@ const pastQuotes = [
     border-radius: 50%;
     background: linear-gradient(135deg, #111 0%, #222 50%, #111 100%);
     position: relative;
-    transition: animation 0.3s ease;
   }
 
-  .phono-disc.spinning {
-    animation: discSpin 2s linear infinite;
-  }
+  .phono-disc.spinning { animation: discSpin 2s linear infinite; }
 
   @keyframes discSpin {
     from { transform: rotate(0deg); }
@@ -587,12 +593,7 @@ const pastQuotes = [
   .phono-disc-groove:nth-child(2) { width: 90px; height: 90px; }
   .phono-disc-groove:nth-child(3) { width: 70px; height: 70px; }
 
-  .phono-horn {
-    width: 80px;
-    height: 60px;
-    margin: 0 auto 0.5rem;
-    position: relative;
-  }
+  .phono-horn { width: 80px; height: 60px; margin: 0 auto 0.5rem; }
 
   .phono-horn-inner {
     width: 0;
@@ -605,9 +606,7 @@ const pastQuotes = [
     transition: all 0.3s ease;
   }
 
-  .phono-horn-inner.playing {
-    animation: hornVibrate 0.3s ease-in-out infinite;
-  }
+  .phono-horn-inner.playing { animation: hornVibrate 0.3s ease-in-out infinite; }
 
   @keyframes hornVibrate {
     0%, 100% { transform: scale(1); }
@@ -629,14 +628,8 @@ const pastQuotes = [
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
   }
 
-  .phono-crank:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-  }
-
-  .phono-crank:active {
-    transform: rotate(180deg) scale(0.95);
-  }
+  .phono-crank:hover { transform: scale(1.1); }
+  .phono-crank:active { transform: rotate(180deg) scale(0.95); }
 
   .phono-now-playing {
     padding: 0.5rem;
@@ -644,7 +637,6 @@ const pastQuotes = [
     font-size: 0.85rem;
     font-style: italic;
     min-height: 1.5rem;
-    transition: all 0.3s ease;
   }
 
   .phono-close {
@@ -693,10 +685,7 @@ const pastQuotes = [
     justify-content: center;
     position: relative;
   }
-  @keyframes tvStatic {
-    0% { background-position: 0 0; }
-    100% { background-position: 0 10px; }
-  }
+  @keyframes tvStatic { 0% { background-position: 0 0; } 100% { background-position: 0 10px; } }
   .tv-reveal {
     position: absolute;
     inset: 0;
@@ -715,45 +704,11 @@ const pastQuotes = [
   .tv-reveal-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.4rem; }
   .tv-reveal-date { font-size: 0.78rem; opacity: 0.7; margin-bottom: 0.6rem; }
   .tv-reveal-text { font-size: 0.9rem; font-style: italic; line-height: 1.5; }
-  .tv-knob-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    padding: 1rem;
-    background: #222;
-  }
-  .tv-knob {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #555, #333);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    transition: transform 0.3s;
-  }
+  .tv-knob-row { display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 1rem; background: #222; }
+  .tv-knob { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #555, #333); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: transform 0.3s; }
   .tv-knob:active { transform: rotate(90deg); }
-  .tv-power-light {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #4a4;
-    box-shadow: 0 0 8px #4a4;
-  }
-  .tv-close {
-    width: 100%;
-    padding: 0.6rem;
-    border: none;
-    background: #333;
-    color: #999;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.82rem;
-    transition: background 0.3s;
-  }
+  .tv-power-light { width: 8px; height: 8px; border-radius: 50%; background: #4a4; box-shadow: 0 0 8px #4a4; }
+  .tv-close { width: 100%; padding: 0.6rem; border: none; background: #333; color: #999; cursor: pointer; font-family: inherit; font-size: 0.82rem; transition: background 0.3s; }
   .tv-close:hover { background: #444; color: #ddd; }
 
   /* ===== 头部 ===== */
@@ -777,36 +732,12 @@ const pastQuotes = [
     60% { transform: translateY(-3px) rotate(-3deg); }
   }
 
-  .past-hero-title {
-    font-size: 3rem;
-    font-weight: 300;
-    letter-spacing: 0.2em;
-    color: var(--past-text);
-    margin: 0 0 0.3rem;
-  }
-  .past-hero-subtitle {
-    font-size: 0.95rem;
-    color: var(--past-text-light);
-    letter-spacing: 0.06em;
-    margin: 0 0 1.5rem;
-  }
-  .past-hero-quote {
-    font-size: 0.95rem;
-    color: var(--past-accent);
-    font-style: italic;
-    margin-bottom: 1.5rem;
-    cursor: pointer;
-    transition: all 0.3s;
-    user-select: none;
-  }
+  .past-hero-title { font-size: 3rem; font-weight: 300; letter-spacing: 0.2em; color: var(--past-text); margin: 0 0 0.3rem; }
+  .past-hero-subtitle { font-size: 0.95rem; color: var(--past-text-light); letter-spacing: 0.06em; margin: 0 0 1.5rem; }
+  .past-hero-quote { font-size: 0.95rem; color: var(--past-accent); font-style: italic; margin-bottom: 1.5rem; cursor: pointer; transition: all 0.3s; user-select: none; }
   .past-hero-quote:hover { transform: scale(1.04); }
 
-  .past-hero-stats {
-    display: flex;
-    align-items: center;
-    gap: 1.2rem;
-    justify-content: center;
-  }
+  .past-hero-stats { display: flex; align-items: center; gap: 1.2rem; justify-content: center; }
   .past-stat {
     background: var(--past-glass);
     backdrop-filter: blur(12px);
@@ -815,8 +746,9 @@ const pastQuotes = [
     padding: 0.8rem 1.4rem;
     text-align: center;
   }
+  .past-stat-avatar { font-size: 1.6rem; display: block; margin-bottom: 0.1rem; }
   .past-stat-num { font-size: 1.8rem; font-weight: 500; display: block; }
-  .past-stat-label { font-size: 0.75rem; color: var(--past-text-light); letter-spacing: 0.06em; display: block; margin-bottom: 0.2rem; }
+  .past-stat-label { font-size: 0.75rem; color: var(--past-text-light); letter-spacing: 0.06em; display: block; }
   .past-stat-divider { width: 1px; height: 36px; background: var(--past-border); }
 
   .past-hero-scroll {
@@ -830,70 +762,30 @@ const pastQuotes = [
     font-size: 0.78rem;
     animation: pastScrollBounce 2s ease-in-out infinite;
   }
-  @keyframes pastScrollBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(5px); }
-  }
+  @keyframes pastScrollBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
 
   /* ===== 卡片 ===== */
   .past-main { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto 4rem; padding: 0 1.5rem; }
   .past-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
   .past-card-link { text-decoration: none; color: inherit; display: block; }
-  .past-card {
-    background: var(--past-glass);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--past-border);
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.4s ease;
-    animation: cardFade 0.6s ease forwards;
-    opacity: 0;
-  }
+  .past-card { background: var(--past-glass); backdrop-filter: blur(16px); border: 1px solid var(--past-border); border-radius: 16px; overflow: hidden; transition: all 0.4s ease; animation: cardFade 0.6s ease forwards; opacity: 0; }
   @keyframes cardFade { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .past-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.05);
-    border-color: rgba(180,140,100,0.5);
-  }
-  .past-card-image-wrap {
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-    background: linear-gradient(135deg, rgba(200,180,160,0.2), rgba(220,200,180,0.1));
-    position: relative;
-  }
+  .past-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.05); border-color: rgba(180,140,100,0.5); }
+  .past-card-image-wrap { width: 100%; height: 200px; overflow: hidden; background: linear-gradient(135deg, rgba(200,180,160,0.2), rgba(220,200,180,0.1)); position: relative; }
   .past-card-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s; }
   .past-card:hover .past-card-image { transform: scale(1.04); }
-  .past-card-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 140px;
-  }
+  .past-card-placeholder { display: flex; align-items: center; justify-content: center; height: 140px; }
   .past-card-placeholder-icon { font-size: 2.5rem; opacity: 0.4; }
   .past-card-body { padding: 0.9rem 1rem 1rem; }
   .past-card-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
   .past-card-date { font-size: 0.72rem; color: var(--past-text-light); }
-  .past-card-tag {
-    font-size: 0.68rem;
-    background: rgba(180,140,100,0.12);
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    color: var(--past-accent);
-  }
+  .past-card-tag { font-size: 0.68rem; background: rgba(180,140,100,0.12); padding: 0.15rem 0.5rem; border-radius: 999px; color: var(--past-accent); }
   .past-card-title { font-size: 1rem; font-weight: 500; margin: 0.3rem 0; line-height: 1.4; }
   .past-card-excerpt { font-size: 0.8rem; color: var(--past-text-light); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   /* ===== 详情 ===== */
   .past-detail { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 3rem 1.5rem; }
-  .past-detail-card {
-    background: var(--past-glass);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--past-border);
-    border-radius: 20px;
-    padding: 2rem;
-    box-shadow: var(--past-shadow);
-  }
+  .past-detail-card { background: var(--past-glass); backdrop-filter: blur(20px); border: 1px solid var(--past-border); border-radius: 20px; padding: 2rem; box-shadow: var(--past-shadow); }
   .past-detail-hero { text-align: center; margin-bottom: 1.5rem; }
   .past-detail-icon { font-size: 2.2rem; display: block; margin-bottom: 0.5rem; }
   .past-detail-title { font-size: 1.4rem; font-weight: 500; margin: 0 0 0.4rem; }
@@ -905,67 +797,31 @@ const pastQuotes = [
   .past-detail-content :global(p){margin:0 0 0.8rem}
   .past-detail-content :global(img){max-width:100%;border-radius:10px;margin:0.8rem 0}
   .past-detail-footer { text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--past-border); }
-  .past-detail-back {
-    display: inline-flex;
-    padding: 0.5rem 1.2rem;
-    border: 1px solid var(--past-border);
-    border-radius: 999px;
-    color: var(--past-text);
-    text-decoration: none;
-    font-size: 0.85rem;
-    background: rgba(255,255,255,0.3);
-    transition: all 0.3s;
-  }
+  .past-detail-back { display: inline-flex; padding: 0.5rem 1.2rem; border: 1px solid var(--past-border); border-radius: 999px; color: var(--past-text); text-decoration: none; font-size: 0.85rem; background: rgba(255,255,255,0.3); transition: all 0.3s; }
   .past-detail-back:hover { background: rgba(255,255,255,0.5); transform: translateX(-3px); }
 
   /* ===== 空状态 ===== */
-  .past-empty {
-    text-align: center;
-    padding: 3rem 1rem;
-    background: var(--past-glass);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--past-border);
-    border-radius: 20px;
-  }
+  .past-empty { text-align: center; padding: 3rem 1rem; background: var(--past-glass); backdrop-filter: blur(12px); border: 1px solid var(--past-border); border-radius: 20px; }
   .past-empty-icon { font-size: 2.5rem; display: block; margin-bottom: 0.8rem; }
   .past-empty h3 { font-size: 1rem; font-weight: 400; margin: 0 0 0.3rem; color: var(--past-text); }
   .past-empty p { font-size: 0.82rem; color: var(--past-text-light); margin: 0.2rem 0; }
 
   /* ===== 分页 ===== */
   .past-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding-top: 2rem; }
-  .past-page-btn {
-    padding: 0.4rem 0.9rem;
-    border: 1px solid var(--past-border);
-    border-radius: 999px;
-    color: var(--past-text);
-    text-decoration: none;
-    font-size: 0.8rem;
-    background: var(--past-glass);
-    backdrop-filter: blur(8px);
-    transition: all 0.3s;
-  }
+  .past-page-btn { padding: 0.4rem 0.9rem; border: 1px solid var(--past-border); border-radius: 999px; color: var(--past-text); text-decoration: none; font-size: 0.8rem; background: var(--past-glass); backdrop-filter: blur(8px); transition: all 0.3s; }
   .past-page-btn:hover { background: rgba(255,255,255,0.5); }
   .past-page-info { font-size: 0.8rem; color: var(--past-text-light); }
 
-  .past-footer {
-    position: relative;
-    z-index: 1;
-    text-align: center;
-    padding: 2.5rem 1rem;
-    font-size: 0.85rem;
-    color: var(--past-text-light);
-    font-style: italic;
-  }
+  .past-footer { position: relative; z-index: 1; text-align: center; padding: 2.5rem 1rem; font-size: 0.85rem; color: var(--past-text-light); font-style: italic; }
 
   @media (max-width: 768px) {
     .past-hero-title { font-size: 2.2rem; }
     .past-masonry { grid-template-columns: 1fr; }
     .floating-buttons { bottom: 1rem; right: 1rem; gap: 0.4rem; }
-    .float-btn { width: 44px; height: 44px; border-radius: 14px; }
+    .float-btn { width: 44px; height: 44px; border-radius: 12px; }
     .float-btn-icon { font-size: 1rem; }
-    .float-btn-label { font-size: 0.48rem; }
-    .phono-turntable { width: 110px; height: 110px; }
-    .phono-disc { width: 85px; height: 85px; }
+    .float-btn-label { font-size: 0.45rem; }
+    .rain-fullscreen-text { font-size: 1.1rem; }
   }
 </style>
 
@@ -1055,14 +911,11 @@ const pastQuotes = [
   // ===== 时间胶囊 =====
   const capsuleTrigger = document.getElementById("capsuleTrigger");
   let capsuleData: { title: string; date: string; excerpt: string }[] = [];
-  try {
-    const el = document.getElementById("pastPostsData");
-    if (el && el.textContent) capsuleData = JSON.parse(el.textContent);
-  } catch {}
+  try { const el = document.getElementById("pastPostsData"); if (el && el.textContent) capsuleData = JSON.parse(el.textContent); } catch {}
 
   capsuleTrigger?.addEventListener("click", () => {
     const overlay = document.createElement("div");
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.2);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.2);backdrop-filter:blur(4px);z-index:10002;display:flex;align-items:center;justify-content:center";
     const modal = document.createElement("div");
     modal.style.cssText = "background:rgba(252,248,240,0.95);border-radius:20px;padding:1.5rem;max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.15)";
     const item = capsuleData.length > 0 ? capsuleData[Math.floor(Math.random() * capsuleData.length)] : null;
@@ -1082,77 +935,64 @@ const pastQuotes = [
     const el = document.getElementById("pastPostsData");
     if (el && el.textContent) {
       const data = JSON.parse(el.textContent) as { author: string }[];
-      const jy = data.filter(d => d.author === "JY").length;
-      const jx = data.filter(d => d.author === "JX").length;
-      const jyEl = document.getElementById("jyCount");
-      const jxEl = document.getElementById("jxCount");
+      const jy = data.filter(d => d.author && d.author.includes("JY")).length;
+      const jx = data.filter(d => d.author && d.author.includes("JX")).length;
+      const jyEl = document.getElementById("jyCount"), jxEl = document.getElementById("jxCount");
       if (jyEl) jyEl.textContent = String(jy);
       if (jxEl) jxEl.textContent = String(jx);
     }
   } catch {}
 
   // ==========================================
-  // 🪟 雨声窗台
+  // 🪟 全屏雨声窗台
   // ==========================================
   const rainWindowToggle = document.getElementById("rainWindowToggle");
-  const rainOverlay = document.getElementById("rainOverlay");
-  const rainDrops = document.getElementById("rainDrops");
-  const rainToggle = document.getElementById("rainToggle");
-  const rainClose = document.getElementById("rainClose");
-  let rainActive = true;
-  let rainInterval: ReturnType<typeof setInterval> | null = null;
+  const rainFullscreen = document.getElementById("rainFullscreen");
+  const rainFSDrops = document.getElementById("rainFullscreenDrops");
+  const rainFSToggle = document.getElementById("rainFSToggle");
+  const rainFSClose = document.getElementById("rainFSClose");
+  let fsRainActive = true;
+  let fsRainInterval: ReturnType<typeof setInterval> | null = null;
 
-  function createRainDrop() {
-    if (!rainDrops || !rainActive) return;
+  function createFSRainDrop() {
+    if (!rainFSDrops || !fsRainActive) return;
     const drop = document.createElement("div");
-    drop.className = "rain-drop";
+    drop.className = "rain-fullscreen-drop";
     drop.style.left = Math.random() * 100 + "%";
-    drop.style.height = Math.random() * 20 + 15 + "px";
-    drop.style.animationDuration = Math.random() * 0.6 + 0.6 + "s";
-    drop.style.animationDelay = Math.random() * 0.3 + "s";
-    rainDrops.appendChild(drop);
-    setTimeout(() => drop.remove(), 1500);
+    drop.style.height = Math.random() * 40 + 30 + "px";
+    drop.style.animationDuration = Math.random() * 0.4 + 0.5 + "s";
+    drop.style.animationDelay = Math.random() * 0.2 + "s";
+    rainFSDrops.appendChild(drop);
+    setTimeout(() => drop.remove(), 1200);
   }
 
-  function startRain() {
-    if (rainInterval) clearInterval(rainInterval);
-    rainInterval = setInterval(createRainDrop, 60);
-    for (let i = 0; i < 40; i++) setTimeout(createRainDrop, i * 25);
+  function startFSRain() {
+    if (fsRainInterval) clearInterval(fsRainInterval);
+    fsRainInterval = setInterval(createFSRainDrop, 30);
+    for (let i = 0; i < 100; i++) setTimeout(createFSRainDrop, i * 18);
   }
 
-  function stopRain() {
-    if (rainInterval) clearInterval(rainInterval);
-    if (rainDrops) rainDrops.innerHTML = "";
+  function stopFSRain() {
+    if (fsRainInterval) clearInterval(fsRainInterval);
+    if (rainFSDrops) rainFSDrops.innerHTML = "";
   }
 
   rainWindowToggle?.addEventListener("click", () => {
-    if (rainOverlay) rainOverlay.style.display = "flex";
-    rainActive = true;
-    if (rainToggle) rainToggle.textContent = "⏯️ 暂停雨";
-    startRain();
+    if (rainFullscreen) rainFullscreen.style.display = "block";
+    fsRainActive = true;
+    if (rainFSToggle) rainFSToggle.textContent = "⏯️ 暂停雨";
+    startFSRain();
   });
 
-  rainToggle?.addEventListener("click", () => {
-    rainActive = !rainActive;
-    if (rainActive) {
-      rainToggle.textContent = "⏯️ 暂停雨";
-      startRain();
-    } else {
-      rainToggle.textContent = "▶️ 继续下雨";
-      stopRain();
-    }
+  rainFSToggle?.addEventListener("click", () => {
+    fsRainActive = !fsRainActive;
+    if (fsRainActive) { rainFSToggle.textContent = "⏯️ 暂停雨"; startFSRain(); }
+    else { rainFSToggle.textContent = "▶️ 继续下雨"; stopFSRain(); }
   });
 
-  rainClose?.addEventListener("click", () => {
-    if (rainOverlay) rainOverlay.style.display = "none";
-    stopRain();
-  });
-
-  rainOverlay?.addEventListener("click", (e) => {
-    if (e.target === rainOverlay) {
-      rainOverlay.style.display = "none";
-      stopRain();
-    }
+  rainFSClose?.addEventListener("click", () => {
+    if (rainFullscreen) rainFullscreen.style.display = "none";
+    stopFSRain();
   });
 
   // ==========================================
@@ -1160,64 +1000,33 @@ const pastQuotes = [
   // ==========================================
   const phonoToggle = document.getElementById("phonographToggle");
   const phonoOverlay = document.getElementById("phonoOverlay");
-  const phonoTurntable = document.getElementById("phonoTurntable");
   const phonoDisc = document.querySelector(".phono-disc") as HTMLElement | null;
   const phonoHornInner = document.querySelector(".phono-horn-inner") as HTMLElement | null;
   const phonoCrank = document.getElementById("phonoCrank");
   const phonoNowPlaying = document.getElementById("phonoNowPlaying");
   const phonoClose = document.getElementById("phonoClose");
   let isPhonoPlaying = false;
-
-  const phonoMemories = [
-    "那些独自走过的路，后来都成了故事...",
-    "在遇见你之前，我练习了很久的独处",
-    "每一段从前，都在为相遇做准备",
-    "没有你的日子，都是序章",
-    "各自发光，然后彼此照亮",
-  ];
+  const phonoMemories = ["那些独自走过的路，后来都成了故事...", "在遇见你之前，我练习了很久的独处", "每一段从前，都在为相遇做准备", "没有你的日子，都是序章", "各自发光，然后彼此照亮"];
   let phonoIndex = 0;
 
-  phonoToggle?.addEventListener("click", () => {
-    if (phonoOverlay) phonoOverlay.style.display = "flex";
-  });
+  phonoToggle?.addEventListener("click", () => { if (phonoOverlay) phonoOverlay.style.display = "flex"; });
 
   phonoCrank?.addEventListener("click", () => {
     if (isPhonoPlaying) return;
     isPhonoPlaying = true;
     phonoDisc?.classList.add("spinning");
     phonoHornInner?.classList.add("playing");
-
     const memory = phonoMemories[phonoIndex % phonoMemories.length];
     phonoIndex++;
-    if (phonoNowPlaying) {
-      phonoNowPlaying.innerHTML = `<span>🎶 正在播放：</span><br><span style="font-style:italic">"${memory}"</span>`;
-    }
-
-    setTimeout(() => {
-      isPhonoPlaying = false;
-      phonoDisc?.classList.remove("spinning");
-      phonoHornInner?.classList.remove("playing");
-    }, 4000);
+    if (phonoNowPlaying) phonoNowPlaying.innerHTML = `<span>🎶 正在播放：</span><br><span style="font-style:italic">"${memory}"</span>`;
+    setTimeout(() => { isPhonoPlaying = false; phonoDisc?.classList.remove("spinning"); phonoHornInner?.classList.remove("playing"); }, 4000);
   });
 
-  phonoClose?.addEventListener("click", () => {
-    if (phonoOverlay) phonoOverlay.style.display = "none";
-    isPhonoPlaying = false;
-    phonoDisc?.classList.remove("spinning");
-    phonoHornInner?.classList.remove("playing");
-  });
-
-  phonoOverlay?.addEventListener("click", (e) => {
-    if (e.target === phonoOverlay) {
-      phonoOverlay.style.display = "none";
-      isPhonoPlaying = false;
-      phonoDisc?.classList.remove("spinning");
-      phonoHornInner?.classList.remove("playing");
-    }
-  });
+  phonoClose?.addEventListener("click", () => { if (phonoOverlay) phonoOverlay.style.display = "none"; isPhonoPlaying = false; phonoDisc?.classList.remove("spinning"); phonoHornInner?.classList.remove("playing"); });
+  phonoOverlay?.addEventListener("click", (e) => { if (e.target === phonoOverlay) { phonoOverlay.style.display = "none"; isPhonoPlaying = false; phonoDisc?.classList.remove("spinning"); phonoHornInner?.classList.remove("playing"); } });
 
   // ==========================================
-  // 📺 旧电视（双击卡片触发）
+  // 📺 旧电视
   // ==========================================
   document.querySelectorAll(".past-card").forEach((card) => {
     card.addEventListener("dblclick", (e) => {
@@ -1225,56 +1034,19 @@ const pastQuotes = [
       const title = (card.querySelector(".past-card-title") as HTMLElement)?.textContent || "无题";
       const date = (card.querySelector(".past-card-date") as HTMLElement)?.textContent || "";
       const excerpt = (card.querySelector(".past-card-excerpt") as HTMLElement)?.textContent || "";
-
-      const overlay = document.createElement("div");
-      overlay.className = "tv-overlay";
-
-      const screen = document.createElement("div");
-      screen.className = "tv-screen";
-
-      const staticDiv = document.createElement("div");
-      staticDiv.className = "tv-static";
-
-      const reveal = document.createElement("div");
-      reveal.className = "tv-reveal";
-      reveal.style.display = "none";
-      reveal.innerHTML = `
-        <div class="tv-reveal-title">${title}</div>
-        <div class="tv-reveal-date">${date}</div>
-        <p class="tv-reveal-text">"${excerpt}"</p>
-      `;
-
-      staticDiv.appendChild(reveal);
-      screen.appendChild(staticDiv);
-
-      const knobRow = document.createElement("div");
-      knobRow.className = "tv-knob-row";
-      const knob = document.createElement("div");
-      knob.className = "tv-knob";
-      knob.textContent = "📺";
-      knob.title = "点击调台";
-      knob.addEventListener("click", () => {
-        if (reveal.style.display === "none") {
-          staticDiv.style.animation = "none";
-          reveal.style.display = "flex";
-        } else {
-          staticDiv.style.animation = "tvStatic 0.1s infinite";
-          reveal.style.display = "none";
-        }
-      });
-      const light = document.createElement("div");
-      light.className = "tv-power-light";
-      knobRow.appendChild(knob);
-      knobRow.appendChild(light);
-      screen.appendChild(knobRow);
-
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "tv-close";
-      closeBtn.textContent = "关掉电视";
-      closeBtn.addEventListener("click", () => overlay.remove());
-      screen.appendChild(closeBtn);
-
-      overlay.appendChild(screen);
+      const overlay = document.createElement("div"); overlay.className = "tv-overlay";
+      const screen = document.createElement("div"); screen.className = "tv-screen";
+      const staticDiv = document.createElement("div"); staticDiv.className = "tv-static";
+      const reveal = document.createElement("div"); reveal.className = "tv-reveal"; reveal.style.display = "none";
+      reveal.innerHTML = `<div class="tv-reveal-title">${title}</div><div class="tv-reveal-date">${date}</div><p class="tv-reveal-text">"${excerpt}"</p>`;
+      staticDiv.appendChild(reveal); screen.appendChild(staticDiv);
+      const knobRow = document.createElement("div"); knobRow.className = "tv-knob-row";
+      const knob = document.createElement("div"); knob.className = "tv-knob"; knob.textContent = "📺";
+      knob.addEventListener("click", () => { if (reveal.style.display === "none") { staticDiv.style.animation = "none"; reveal.style.display = "flex"; } else { staticDiv.style.animation = "tvStatic 0.1s infinite"; reveal.style.display = "none"; } });
+      const light = document.createElement("div"); light.className = "tv-power-light";
+      knobRow.appendChild(knob); knobRow.appendChild(light); screen.appendChild(knobRow);
+      const closeBtn = document.createElement("button"); closeBtn.className = "tv-close"; closeBtn.textContent = "关掉电视"; closeBtn.addEventListener("click", () => overlay.remove());
+      screen.appendChild(closeBtn); overlay.appendChild(screen);
       overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
       document.body.appendChild(overlay);
     });
@@ -1286,68 +1058,56 @@ const pastQuotes = [
   const sandToggle = document.getElementById("sandToggle");
   const sandCanvas = document.getElementById("sandCanvas") as HTMLCanvasElement | null;
   const sandHint = document.getElementById("sandHint");
-  let sandOn = false;
-  let sandCtx: CanvasRenderingContext2D | null = null;
-  let sandDrawing = false;
-  let sandPoints: { x: number; y: number }[] = [];
+  let sandOn = false, sandCtx: CanvasRenderingContext2D | null = null, sandDrawing = false, sandPoints: { x: number; y: number }[] = [];
 
   sandToggle?.addEventListener("click", () => {
     sandOn = !sandOn;
     if (sandOn) {
-      sandToggle.style.background = "rgba(200,170,120,0.3)";
-      sandCanvas?.classList.add("active");
-      if (sandHint) sandHint.classList.add("active");
-      if (sandCanvas) {
-        sandCanvas.width = innerWidth;
-        sandCanvas.height = innerHeight;
-        sandCtx = sandCanvas.getContext("2d");
-        if (sandCtx) {
-          sandCtx.fillStyle = "rgba(200, 170, 120, 0.12)";
-          sandCtx.fillRect(0, 0, sandCanvas.width, sandCanvas.height);
-        }
-      }
+      sandToggle.style.background = "rgba(200,170,120,0.3)"; sandCanvas?.classList.add("active"); if (sandHint) sandHint.classList.add("active");
+      if (sandCanvas) { sandCanvas.width = innerWidth; sandCanvas.height = innerHeight; sandCtx = sandCanvas.getContext("2d"); if (sandCtx) { sandCtx.fillStyle = "rgba(200, 170, 120, 0.12)"; sandCtx.fillRect(0, 0, sandCanvas.width, sandCanvas.height); } }
       document.body.style.cursor = "crosshair";
     } else {
-      sandToggle.style.background = "";
-      sandCanvas?.classList.remove("active");
-      if (sandHint) sandHint.classList.remove("active");
-      document.body.style.cursor = "";
-      sandPoints = [];
+      sandToggle.style.background = ""; sandCanvas?.classList.remove("active"); if (sandHint) sandHint.classList.remove("active");
+      document.body.style.cursor = ""; sandPoints = [];
     }
   });
-
-  sandCanvas?.addEventListener("mousedown", (e) => {
-    if (!sandOn || !sandCtx) return;
-    sandDrawing = true;
-    sandPoints = [{ x: e.clientX, y: e.clientY }];
-  });
-
+  sandCanvas?.addEventListener("mousedown", (e) => { if (!sandOn || !sandCtx) return; sandDrawing = true; sandPoints = [{ x: e.clientX, y: e.clientY }]; });
   sandCanvas?.addEventListener("mousemove", (e) => {
     if (!sandOn || !sandDrawing || !sandCtx) return;
     sandPoints.push({ x: e.clientX, y: e.clientY });
-    sandCtx.strokeStyle = "rgba(180, 140, 100, 0.5)";
-    sandCtx.lineWidth = 8;
-    sandCtx.lineCap = "round";
-    sandCtx.lineJoin = "round";
-    sandCtx.beginPath();
-    sandCtx.moveTo(sandPoints[sandPoints.length - 2]?.x || e.clientX, sandPoints[sandPoints.length - 2]?.y || e.clientY);
-    sandCtx.lineTo(e.clientX, e.clientY);
-    sandCtx.stroke();
-    if (sandPoints.length > 60) {
-      sandCtx.fillStyle = "rgba(200, 170, 120, 0.02)";
-      sandCtx.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
-    }
+    sandCtx.strokeStyle = "rgba(180, 140, 100, 0.5)"; sandCtx.lineWidth = 8; sandCtx.lineCap = "round"; sandCtx.lineJoin = "round";
+    sandCtx.beginPath(); sandCtx.moveTo(sandPoints[sandPoints.length - 2]?.x || e.clientX, sandPoints[sandPoints.length - 2]?.y || e.clientY); sandCtx.lineTo(e.clientX, e.clientY); sandCtx.stroke();
+    if (sandPoints.length > 60) { sandCtx.fillStyle = "rgba(200, 170, 120, 0.02)"; sandCtx.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height); }
   });
-
   sandCanvas?.addEventListener("mouseup", () => {
     sandDrawing = false;
-    if (sandCtx && sandCanvas) {
-      const fadeOut = setInterval(() => {
-        if (!sandOn || sandDrawing) { clearInterval(fadeOut); return; }
-        sandCtx!.fillStyle = "rgba(200, 170, 120, 0.015)";
-        sandCtx!.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height);
-      }, 100);
-      setTimeout(() => clearInterval(fadeOut), 5000);
-    }
+    if (sandCtx && sandCanvas) { const fadeOut = setInterval(() => { if (!sandOn || sandDrawing) { clearInterval(fadeOut); return; } sandCtx!.fillStyle = "rgba(200, 170, 120, 0.015)"; sandCtx!.fillRect(0, 0, sandCanvas!.width, sandCanvas!.height); }, 100); setTimeout(() => clearInterval(fadeOut), 5000); }
   });
+
+  // ==========================================
+  // ✨ 萤火虫
+  // ==========================================
+  const fireflyToggle = document.getElementById("fireflyToggle");
+  const fireflyCanvas = document.getElementById("fireflyCanvas") as HTMLCanvasElement | null;
+  let fireflyOn = false, fireflyCtx: CanvasRenderingContext2D | null = null, fireflyAnimId = 0;
+  const fireflies: { x: number; y: number; vx: number; vy: number; r: number; phase: number }[] = [];
+
+  fireflyToggle?.addEventListener("click", () => {
+    fireflyOn = !fireflyOn;
+    if (fireflyOn) {
+      fireflyToggle.style.background = "rgba(255,240,150,0.3)"; fireflyCanvas?.classList.add("active");
+      if (fireflyCanvas) { fireflyCanvas.width = innerWidth; fireflyCanvas.height = innerHeight; fireflyCtx = fireflyCanvas.getContext("2d"); fireflies.length = 0;
+        for (let i = 0; i < 30; i++) fireflies.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6, r: Math.random() * 2 + 1, phase: Math.random() * Math.PI * 2 }); animateFireflies(); }
+    } else { fireflyToggle.style.background = ""; fireflyCanvas?.classList.remove("active"); cancelAnimationFrame(fireflyAnimId); }
+  });
+  function animateFireflies() { if (!fireflyOn || !fireflyCtx || !fireflyCanvas) return; const ctx = fireflyCtx; ctx.clearRect(0, 0, fireflyCanvas.width, fireflyCanvas.height); const t = Date.now() / 1000; fireflies.forEach(f => { f.x += f.vx + Math.sin(t * 2 + f.phase) * 0.3; f.y += f.vy + Math.cos(t * 2 + f.phase) * 0.3; if (f.x < 0) f.x = fireflyCanvas!.width; if (f.x > fireflyCanvas!.width) f.x = 0; if (f.y < 0) f.y = fireflyCanvas!.height; if (f.y > fireflyCanvas!.height) f.y = 0; const alpha = 0.3 + Math.sin(t * 3 + f.phase) * 0.3; const glow = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 6); glow.addColorStop(0, `rgba(255,240,180,${alpha})`); glow.addColorStop(0.5, `rgba(255,220,120,${alpha * 0.4})`); glow.addColorStop(1, "transparent"); ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 6, 0, Math.PI * 2); ctx.fill(); }); fireflyAnimId = requestAnimationFrame(animateFireflies); }
+
+  // ==========================================
+  // 🫧 泡泡
+  // ==========================================
+  const bubbleToggle = document.getElementById("bubbleToggle");
+  const bubbleContainer = document.getElementById("bubbleContainer");
+  let bubbleOn = false, bubbleInterval: ReturnType<typeof setInterval> | null = null;
+  function createBubble() { if (!bubbleContainer || !bubbleOn) return; const bubble = document.createElement("div"); bubble.className = "bubble"; const size = Math.random() * 30 + 15; bubble.style.width = size + "px"; bubble.style.height = size + "px"; bubble.style.left = Math.random() * 90 + "%"; bubble.style.bottom = "-40px"; bubble.style.animationDuration = Math.random() * 4 + 4 + "s"; bubbleContainer.appendChild(bubble); setTimeout(() => bubble.remove(), 8000); }
+  bubbleToggle?.addEventListener("click", () => { bubbleOn = !bubbleOn; if (bubbleOn) { bubbleToggle.style.background = "rgba(200,180,220,0.3)"; bubbleContainer?.classList.add("active"); bubbleInterval = setInterval(createBubble, 400); for (let i = 0; i < 10; i++) setTimeout(createBubble, i * 200); } else { bubbleToggle.style.background = ""; bubbleContainer?.classList.remove("active"); if (bubbleInterval) clearInterval(bubbleInterval); if (bubbleContainer) bubbleContainer.innerHTML = ""; } });
 </script>
